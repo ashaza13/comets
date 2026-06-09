@@ -35,11 +35,26 @@ body {
   min-width: 0;
 }
 
+/* ── Chat panel wrapper (slide-in / toggle) ──────────────────────────────── */
+
+.chat-panel-wrapper {
+  height: 100%;
+  overflow: hidden;
+  width: 0;
+  flex-shrink: 0;
+  transition: width 0.55s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.chat-panel-wrapper--open {
+  width: 340px;
+}
+
 /* ── Chat panel ──────────────────────────────────────────────────────────── */
 
 .chat-panel {
   width: 340px;
   min-width: 280px;
+  height: 100%;
   display: flex;
   flex-direction: column;
   background: var(--panel-bg);
@@ -53,7 +68,27 @@ body {
   align-items: center;
   padding: 14px 16px 10px;
   border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
 }
+
+.chat-header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.chat-close-btn {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 2px 4px;
+  line-height: 1;
+  transition: color 0.15s;
+}
+
+.chat-close-btn:hover { color: var(--text); }
 
 .chat-title {
   font-size: 13px;
@@ -293,3 +328,351 @@ body {
 
 .send-btn:hover:not(:disabled) { opacity: 0.85; }
 .send-btn:disabled { opacity: 0.3; cursor: default; }
+
+/* ── Floating signals toggle button ─────────────────────────────────────── */
+
+.chat-open-btn {
+  position: fixed;
+  bottom: 24px;
+  left: 24px;
+  z-index: 20;
+  background: rgba(13, 13, 24, 0.88);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 8px 18px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.07em;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.chat-open-btn:hover {
+  border-color: var(--accent);
+  color: #d0d0f8;
+}
+
+/* ── Nucleus hover tooltip ───────────────────────────────────────────────── */
+
+.nucleus-tooltip {
+  background: rgba(9, 9, 15, 0.94);
+  border: 1px solid #2a2a45;
+  border-radius: 5px;
+  padding: 10px 12px;
+  min-width: 170px;
+  font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+  font-size: 10px;
+  color: #b8b8d8;
+  line-height: 1.5;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.nt-section { display: flex; flex-direction: column; gap: 4px; }
+
+.nt-label {
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #4a4a6a;
+  margin-bottom: 2px;
+}
+
+.nt-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.nt-divider {
+  height: 1px;
+  background: #1e1e32;
+  margin: 6px 0;
+}
+
+.nt-swatch {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.nt-bar {
+  flex: 1;
+  height: 3px;
+  background: #1a1a2e;
+  border-radius: 2px;
+  overflow: hidden;
+  max-width: 55px;
+}
+
+.nt-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+  opacity: 0.8;
+}
+
+/* ── Chat panel wrapper (slide-in on intro exit) ─────────────────────────── */
+
+.chat-panel-wrapper {
+  overflow: hidden;
+  width: 0;
+  flex-shrink: 0;
+  transition: width 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.chat-panel-wrapper--visible {
+  width: 340px;
+}
+
+/* ── Intro overlay ───────────────────────────────────────────────────────── */
+
+.intro-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(9, 9, 15, 0.82);
+  backdrop-filter: blur(2px);
+  transition: opacity 0.6s ease;
+}
+
+.intro-overlay--exiting {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.intro-skip {
+  position: absolute;
+  top: 20px;
+  right: 24px;
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-family: var(--mono);
+  font-size: 11px;
+  cursor: pointer;
+  padding: 4px 0;
+  transition: color 0.15s;
+  letter-spacing: 0.04em;
+}
+
+.intro-skip:hover { color: var(--text); }
+
+/* ── Slide content ───────────────────────────────────────────────────────── */
+
+.intro-content {
+  max-width: 560px;
+  width: 100%;
+  padding: 0 32px;
+  opacity: 0;
+  transform: translateY(14px);
+  transition: opacity 0.38s ease, transform 0.38s ease;
+}
+
+.intro-content--visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.intro-slide {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.intro-eyebrow {
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.intro-title {
+  font-family: var(--mono);
+  font-size: 36px;
+  font-weight: 600;
+  color: #e0e0f8;
+  line-height: 1.18;
+  letter-spacing: -0.01em;
+}
+
+.intro-body {
+  font-size: 13px;
+  line-height: 1.8;
+  color: var(--text);
+  max-width: 460px;
+}
+
+/* Axes slide */
+.intro-axes {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 4px 0;
+}
+
+.intro-axis-row {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.intro-axis-label {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+
+.intro-axis-desc {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+/* Footer: dots or CTA */
+.intro-slide-footer {
+  padding-top: 8px;
+}
+
+.intro-dots {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.intro-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  border: none;
+  background: var(--text-dim);
+  opacity: 0.35;
+  cursor: pointer;
+  padding: 0;
+  transition: opacity 0.2s, background 0.2s;
+}
+
+.intro-dot--active {
+  opacity: 1;
+  background: var(--accent);
+}
+
+.intro-dot--done {
+  opacity: 0.6;
+}
+
+.intro-cta {
+  padding: 10px 28px;
+  background: var(--accent);
+  border: none;
+  border-radius: var(--radius);
+  color: #fff;
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.15s;
+}
+
+.intro-cta:hover {
+  opacity: 0.88;
+  transform: translateY(-1px);
+}
+
+/* ── Questions phase ─────────────────────────────────────────────────────── */
+
+.intro-questions {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.intro-q-progress {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+}
+
+.intro-q-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--text-dim);
+  opacity: 0.3;
+  display: inline-block;
+  transition: opacity 0.3s, background 0.3s;
+}
+
+.intro-q-dot--filled {
+  background: var(--accent);
+  opacity: 1;
+}
+
+.intro-q-prompt {
+  font-size: 18px;
+  line-height: 1.65;
+  color: #d8d8f0;
+  font-weight: 400;
+  transition: opacity 0.3s ease;
+  min-height: 60px;
+}
+
+.intro-q-prompt--loading {
+  opacity: 0.2;
+}
+
+.intro-q-error {
+  font-size: 11px;
+  color: #ff6b6b;
+}
+
+.intro-q-input-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+.intro-q-textarea {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.6;
+  padding: 10px 12px;
+  resize: none;
+  transition: border-color 0.15s, opacity 0.15s;
+}
+
+.intro-q-textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.intro-q-textarea:disabled {
+  opacity: 0.4;
+}
+
+.intro-q-submit {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  background: var(--accent);
+  border: none;
+  border-radius: var(--radius);
+  color: #fff;
+  font-size: 17px;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.intro-q-submit:hover:not(:disabled) { opacity: 0.85; }
+.intro-q-submit:disabled { opacity: 0.3; cursor: default; }

@@ -123,9 +123,10 @@ interface Props {
   isLoading: boolean
   error: string | null
   onSend: (text: string) => void
+  onClose: () => void
 }
 
-export function ChatPanel({ state, connected, messages, promptSuggestion, isLoading, error, onSend }: Props) {
+export function ChatPanel({ state, connected, messages, promptSuggestion, isLoading, error, onSend, onClose }: Props) {
   const [input, setInput] = useState('')
   const historyRef = useRef<HTMLDivElement>(null)
 
@@ -153,9 +154,10 @@ export function ChatPanel({ state, connected, messages, promptSuggestion, isLoad
     <div className="chat-panel">
       <div className="chat-header">
         <span className="chat-title">Personality Vectorscope</span>
-        {state && (
-          <span className="message-count">{state.message_count} signals</span>
-        )}
+        <div className="chat-header-right">
+          {state && <span className="message-count">{state.message_count} signals</span>}
+          <button className="chat-close-btn" onClick={onClose} aria-label="Close panel">✕</button>
+        </div>
       </div>
 
       {state && <StatePanel state={state} />}

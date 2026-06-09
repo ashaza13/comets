@@ -61,9 +61,10 @@ function Graticule() {
 interface Props {
   state: SessionState | null
   isLoading: boolean
+  demoMode?: boolean
 }
 
-export function Scene({ state, isLoading }: Props) {
+export function Scene({ state, isLoading, demoMode = false }: Props) {
   return (
     <Canvas
       camera={{ position: [0, 0, 7], fov: 50 }}
@@ -78,14 +79,14 @@ export function Scene({ state, isLoading }: Props) {
       <Axis direction={[0, 1, 0]} label="abstract →"    color="#6bff9e" />
       <Axis direction={[0, 0, 1]} label="← analytical"  color="#6bb5ff" />
 
-      <PersonalityMesh state={state} isLoading={isLoading} />
+      <PersonalityMesh state={state} isLoading={isLoading} demoMode={demoMode} />
 
       <OrbitControls
         enablePan={false}
         minDistance={3}
         maxDistance={14}
-        autoRotate={!state || state.message_count === 0}
-        autoRotateSpeed={0.4}
+        autoRotate={demoMode || !state || state.message_count === 0}
+        autoRotateSpeed={demoMode ? 0.6 : 0.4}
       />
     </Canvas>
   )
