@@ -70,3 +70,14 @@ class MessageResponse(BaseModel):
     deltas: SignalDeltas
     state: SessionState
     prompt_suggestion: Optional[str] = None  # next conversational prompt to show user
+
+
+class SelectedInterestItem(BaseModel):
+    id: str
+    label: str
+    path: list[str]
+    depth: int = Field(..., ge=1)
+
+
+class InterestsRequest(BaseModel):
+    interests: list[SelectedInterestItem]

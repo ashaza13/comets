@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { InterestExplorer } from './InterestExplorer'
+import type { SelectedInterest } from './InterestExplorer'
 
 const SLIDES = [
   {
@@ -39,8 +41,8 @@ const SLIDES = [
   },
 ] as const
 
-// After this many answered questions, App transitions to main layout
-export const INTRO_COMPLETE_AT = 3
+// After this many free-text answers, App transitions to main layout
+export const INTRO_COMPLETE_AT = 2
 
 interface Props {
   exiting: boolean
@@ -49,11 +51,12 @@ interface Props {
   isLoading: boolean
   error: string | null
   onSend: (text: string) => void
+  onInterestsComplete: (interests: SelectedInterest[]) => void
   messageCount: number
   onSkip: () => void
 }
 
-type InternalPhase = 'slides' | 'questions'
+type InternalPhase = 'slides' | 'interests' | 'questions'
 
 export function IntroFlow({
   exiting,
@@ -62,6 +65,7 @@ export function IntroFlow({
   isLoading,
   error,
   onSend,
+  onInterestsComplete,
   messageCount,
   onSkip,
 }: Props) {
@@ -89,7 +93,7 @@ export function IntroFlow({
     if (slideIdx < SLIDES.length - 1) {
       fadeTransition(() => setSlideIdx(s => s + 1))
     } else {
-      fadeTransition(() => setInternalPhase('questions'))
+      fadeTransition(() => setInternalPhase('interests'))
     }
   }, [slideIdx, fadeTransition])
 
@@ -99,6 +103,14 @@ export function IntroFlow({
       setTimeout(() => textareaRef.current?.focus(), 400)
     }
   }, [internalPhase])
+
+  const handleInterestsComplete = useCallback(
+    (interests: SelectedInterest[]) => {
+      onInterestsComplete(interests)
+      fadeTransition(() => setInternalPhase('questions'))
+    },
+    [onInterestsComplete, fadeTransition],
+  )
 
   const handleSubmit = useCallback(() => {
     const trimmed = input.trim()
@@ -120,7 +132,9 @@ export function IntroFlow({
         skip →
       </button>
 
-      <div className={`intro-content ${contentVisible ? 'intro-content--visible' : ''}`}>
+      <div
+        className={`intro-content ${contentVisible ? 'intro-content--visible' : ''} ${internalPhase === 'interests' ? 'intro-content--wide' : ''}`}
+      >
 
         {/* ── SLIDES ─────────────────────────────────────────────────────── */}
         {internalPhase === 'slides' && (
@@ -173,6 +187,11 @@ export function IntroFlow({
           </div>
         )}
 
+        {/* ── INTERESTS ──────────────────────────────────────────────────── */}
+        {internalPhase === 'interests' && (
+          <InterestExplorer onComplete={handleInterestsComplete} />
+        )}
+
         {/* ── QUESTIONS ──────────────────────────────────────────────────── */}
         {internalPhase === 'questions' && (
           <div className="intro-questions">
@@ -217,3 +236,5 @@ export function IntroFlow({
     </div>
   )
 }
+
+export type { SelectedInterest }

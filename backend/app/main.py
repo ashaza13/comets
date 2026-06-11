@@ -5,11 +5,12 @@ from dotenv import load_dotenv
 
 from app.llm.provider import LLMConfig, load_config
 from app.signals.extractor import extract_signals
-from app.signals.models import CreateSessionResponse, MessageRequest, MessageResponse
+from app.signals.models import CreateSessionResponse, MessageRequest, MessageResponse, InterestsRequest
 from app.session.state import (
     create_session,
     get_session,
     get_prompt_suggestion,
+    seed_interests,
     update_session,
 )
 
@@ -57,6 +58,15 @@ def get_session_state(session_id: str):
     if state is None:
         raise HTTPException(status_code=404, detail="Session not found")
     return state
+
+
+# ── Interest seeding ───────────────────────────────────────────────────────────
+
+@app.post("/session/{session_id}/interests", status_code=204)
+def set_interests(session_id: str, body: InterestsRequest):
+    if get_session(session_id) is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+    seed_interests(session_id, [i.model_dump() for i in body.interests])
 
 
 # ── Message processing ─────────────────────────────────────────────────────────

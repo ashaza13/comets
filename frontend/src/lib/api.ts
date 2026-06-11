@@ -1,4 +1,4 @@
-import type { MessageResponse, SessionState } from './types'
+import type { MessageResponse, SessionState, SelectedInterest } from './types'
 
 const BASE = '/api'
 
@@ -23,4 +23,16 @@ export async function sendMessage(sessionId: string, text: string): Promise<Mess
   })
   if (!res.ok) throw new Error(`Message failed: ${res.status}`)
   return res.json()
+}
+
+export async function submitInterests(
+  sessionId: string,
+  interests: SelectedInterest[],
+): Promise<void> {
+  const res = await fetch(`${BASE}/session/${sessionId}/interests`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ interests }),
+  })
+  if (!res.ok) throw new Error(`Interests failed: ${res.status}`)
 }

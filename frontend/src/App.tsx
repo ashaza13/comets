@@ -2,8 +2,8 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { Scene } from './components/Scene'
 import { ChatPanel } from './components/ChatPanel'
 import { IntroFlow, INTRO_COMPLETE_AT } from './components/IntroFlow'
-import { createSession, sendMessage } from './lib/api'
-import type { SessionState, SignalDeltas } from './lib/types'
+import { createSession, sendMessage, submitInterests } from './lib/api'
+import type { SessionState, SignalDeltas, SelectedInterest } from './lib/types'
 
 interface Message {
   id: string
@@ -24,11 +24,13 @@ export default function App() {
   const [introExiting, setIntroExiting]         = useState(false)
   const [chatOpen, setChatOpen]                 = useState(false)
   const idCounter                               = useRef(0)
+  const sessionIdRef                            = useRef<string | null>(null)
 
   useEffect(() => {
     createSession()
       .then((id) => {
         setSessionId(id)
+        sessionIdRef.current = id
         setPromptSuggestion(
           "What's been on your mind lately? Could be anything — work, something you saw, a feeling you can't shake.",
         )
@@ -48,6 +50,17 @@ export default function App() {
     setIntroExiting(true)
     setTimeout(() => setPhase('main'), 650)
   }, [])
+
+  const handleInterestsComplete = useCallback(
+    (interests: SelectedInterest[]) => {
+      const id = sessionIdRef.current
+      if (!id) return
+      submitInterests(id, interests).catch(() => {
+        // Non-fatal: interests are seeded best-effort
+      })
+    },
+    [],
+  )
 
   const handleSend = useCallback(
     async (text: string) => {
@@ -114,6 +127,7 @@ export default function App() {
           isLoading={isLoading}
           error={error}
           onSend={handleSend}
+          onInterestsComplete={handleInterestsComplete}
           messageCount={messages.length}
           onSkip={skipIntro}
         />

@@ -54,3 +54,10 @@ export interface MessageResponse {
   state: SessionState
   prompt_suggestion: string | null
 }
+
+export interface SelectedInterest {
+  id: string
+  label: string
+  path: string[]
+  depth: number
+}

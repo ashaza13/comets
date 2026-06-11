@@ -120,3 +120,33 @@ def get_prompt_suggestion(session_id: str) -> str | None:
     if state is None:
         return None
     return _get_prompt_suggestion(state.message_count)
+
+
+def seed_interests(session_id: str, interests: list[dict]) -> SessionState:
+    """Seed a session's interest depths from the explorer selections.
+
+    Depth in the tree maps to depth score: each level adds 0.5, capped at max.
+    The root category (path[0]) also receives a smaller seed so it registers
+    even when a niche subgenre is the only selection from that domain.
+    """
+    state = _sessions.get(session_id)
+    if state is None:
+        raise KeyError(session_id)
+
+    for item in interests:
+        node_id = item["id"]
+        path    = item["path"]
+        depth   = item["depth"]
+
+        # Niche score: deeper selection → higher depth score
+        score = _clamp(depth * 0.5, 0.0, _INTEREST_MAX_DEPTH)
+        state.interests[node_id] = max(state.interests.get(node_id, 0.0), score)
+
+        # Also seed the root category with a baseline if it's a sub-selection
+        if len(path) > 1:
+            root_domain = path[0]
+            baseline = 0.4
+            state.interests[root_domain] = max(state.interests.get(root_domain, 0.0), baseline)
+
+    _sessions[session_id] = state
+    return state
