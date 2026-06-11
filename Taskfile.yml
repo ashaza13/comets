@@ -1,0 +1,39 @@
+version: '3'
+
+tasks:
+  default:
+    desc: Start frontend + backend dev servers (alias for dev)
+    cmds:
+      - task: dev
+
+  dev:
+    desc: Start frontend and backend dev servers concurrently
+    deps:
+      - backend
+      - frontend
+
+  backend:
+    desc: Start FastAPI backend on :8000
+    dir: backend
+    cmd: uvicorn app.main:app --reload --port 8000
+
+  frontend:
+    desc: Start Vite frontend on :5173
+    dir: frontend
+    cmd: npm run dev
+
+  install:
+    desc: Install all dependencies (backend pip + frontend npm)
+    cmds:
+      - task: install:backend
+      - task: install:frontend
+
+  install:backend:
+    internal: true
+    dir: backend
+    cmd: pip install -r requirements.txt
+
+  install:frontend:
+    internal: true
+    dir: frontend
+    cmd: npm install
