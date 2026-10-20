@@ -11,7 +11,8 @@ import { mulberry32 } from '../lib/sky'
 import { useReducedMotion } from '../hooks/useReducedMotion'
 
 const DURATION = 1.6
-const RING_SIZE = 3.2
+// Plane size; the ring itself reaches about 72% of the way to the edge.
+const RING_SIZE = 4.4
 const PARTICLES = 260
 
 interface Props {

@@ -8,6 +8,9 @@ import type { CometLook } from '../../lib/comet'
 import { useReducedMotion } from '../../hooks/useReducedMotion'
 
 const BASE_SIZE = 1.5
+// The plane is drawn this much larger than the glow, leaving room for the
+// stretched trailing side to fade out before the plane's edge.
+const HEADROOM = 1.8
 
 /**
  * The gas cloud around the nucleus. Colour = emotion, brightness and size =
@@ -27,6 +30,7 @@ export function Coma({ look }: { look: CometLook }) {
       uPulse: { value: 1 },
       uTrail: { value: new THREE.Vector2(0, -1) },
       uStretch: { value: 0 },
+      uHeadroom: { value: HEADROOM },
     }),
     [],
   )
@@ -48,7 +52,7 @@ export function Coma({ look }: { look: CometLook }) {
     const speed = look.velocity.length()
     u.uStretch.value = planar * (0.35 + Math.min(speed * 2.5, 1.2))
 
-    mesh.current.scale.setScalar(BASE_SIZE * (0.75 + 0.35 * look.energy) * (1 + 0.5 * look.spread))
+    mesh.current.scale.setScalar(HEADROOM * BASE_SIZE * (0.75 + 0.35 * look.energy) * (1 + 0.5 * look.spread))
   })
 
   return (
