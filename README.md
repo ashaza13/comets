@@ -132,6 +132,13 @@ The prompt flow is ordered to build trust and extract progressively richer signa
 | Dust tail | The path through every observation so far, in the colour of each moment, scattering as it ages |
 | Ion tail | The current heading: a straight plasma streak pointing back along the latest move |
 
+### The journey
+
+While you answer, the camera travels with the comet and the axes stay hidden; each answer fires a
+flare and the comet glides to its new position, leaving a memory star behind. After the last
+question the journey replays from the start, then the axes fade in around it. Hover a memory star to
+read that answer back, and use the timeline to scrub or replay the journey.
+
 Personality is estimated with a per-axis Kalman filter, so repeated readings converge on
 where the person sits instead of drifting to the edge of the space.
 

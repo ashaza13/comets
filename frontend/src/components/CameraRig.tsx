@@ -23,9 +23,15 @@ type Controls = React.ComponentRef<typeof OrbitControls>
 interface Props {
   mode: CameraMode
   head: RefObject<THREE.Group | null>
+  /** Start far out in space and glide in. */
+  flyIn?: boolean
 }
 
-export function CameraRig({ mode, head }: Props) {
+const FLY_IN_SCALE = 5
+const FLY_IN_SECONDS = 6
+const MAX_DISTANCE = 14
+
+export function CameraRig({ mode, head, flyIn = false }: Props) {
   const controls = useRef<Controls>(null)
   // endedAt is null until the frame loop stamps it with the clock's time.
   const interaction = useRef<{ active: boolean; endedAt: number | null }>({ active: false, endedAt: -Infinity })
@@ -40,9 +46,15 @@ export function CameraRig({ mode, head }: Props) {
     if (interaction.current.endedAt === null) interaction.current.endedAt = now
     const { active, endedAt } = interaction.current
 
-    // A new mode re-frames the shot, except on first mount (keep the initial view).
+    // A new mode re-frames the shot. On first mount, either keep the initial
+    // view or, for a fly-in, start far out and glide to the mode's distance.
     if (framing.current.mode !== mode) {
-      framing.current = { mode, until: framing.current.mode === null ? 0 : now + FRAMING_SECONDS }
+      const first = framing.current.mode === null
+      if (first && flyIn && !reducedMotion) {
+        c.maxDistance = Infinity
+        camera.position.multiplyScalar(FLY_IN_SCALE)
+      }
+      framing.current = { mode, until: first ? (flyIn ? now + FLY_IN_SECONDS : 0) : now + FRAMING_SECONDS }
     }
 
     // Follow: move the orbit target to the comet and carry the camera along by
@@ -62,6 +74,9 @@ export function CameraRig({ mode, head }: Props) {
       camera.position.copy(c.target).addScaledVector(offset.normalize(), length.v)
     }
 
+    // Restore the zoom limit once a fly-in has come back within it.
+    if (c.maxDistance > MAX_DISTANCE && camera.position.distanceTo(c.target) <= MAX_DISTANCE) c.maxDistance = MAX_DISTANCE
+
     const idle = !active && now - endedAt > IDLE_RESUME_SECONDS
     const spin = reducedMotion || !idle ? 0 : mode === 'demo' ? 0.5 : 0.2
     easing.damp(c, 'autoRotateSpeed', spin, 1.5, delta)
@@ -75,7 +90,7 @@ export function CameraRig({ mode, head }: Props) {
       enableDamping
       dampingFactor={0.06}
       minDistance={3}
-      maxDistance={14}
+      maxDistance={MAX_DISTANCE}
       autoRotate
       autoRotateSpeed={0}
       onStart={() => {

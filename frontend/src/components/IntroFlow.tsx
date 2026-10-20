@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { AXES } from '../lib/spec'
+import { AXES, PROMPTS } from '../lib/spec'
 
 interface Slide {
   eyebrow: string | null
@@ -46,7 +46,7 @@ const SLIDES: Slide[] = [
   {
     eyebrow: 'ready',
     title: 'No right answers.',
-    body: 'Just respond honestly. The scope reads the signals in how you write.',
+    body: `Answer ${PROMPTS.length} questions honestly. Your comet travels with each answer, and the full map of where you are appears at the end.`,
     axes: null,
     cta: 'Begin',
     autoAdvance: null,

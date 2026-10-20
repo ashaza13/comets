@@ -690,3 +690,99 @@ body {
   left: auto;
   right: 24px;
 }
+
+/* ── Memory cards (hover a past answer's star) ─────────────────────────────── */
+
+.memory-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 240px;
+  white-space: normal;
+}
+
+.memory-card .nt-row {
+  justify-content: flex-start;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.memory-card .nt-swatch {
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+
+.memory-prompt {
+  color: var(--text-dim);
+  font-size: 10px;
+}
+
+.memory-text {
+  color: var(--text);
+  white-space: normal;
+  line-height: 1.45;
+}
+
+.memory-reading {
+  color: var(--text-dim);
+  font-style: italic;
+  white-space: normal;
+}
+
+.memory-axes {
+  display: flex;
+  gap: 8px;
+  font-size: 10px;
+}
+
+/* ── Journey timeline ──────────────────────────────────────────────────────── */
+
+.timeline {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 15;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: min(440px, calc(100% - 330px));
+  padding: 8px 14px;
+  background: rgba(13, 13, 24, 0.72);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  backdrop-filter: blur(6px);
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text);
+}
+
+.timeline-play {
+  background: none;
+  border: none;
+  color: var(--text);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 0 2px;
+}
+
+.timeline-play:disabled { color: var(--text-dim); cursor: default; }
+
+.timeline-range {
+  flex: 1;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.timeline-label {
+  color: var(--text-dim);
+  min-width: 34px;
+  text-align: right;
+}
+
+@media (max-width: 640px) {
+  .timeline {
+    bottom: 76px;
+    width: calc(100% - 32px);
+  }
+}

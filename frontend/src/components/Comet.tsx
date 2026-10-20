@@ -21,6 +21,10 @@ interface Props {
   history: CometState[]
   isLoading: boolean
   demo: boolean
+  /** Smoothing time (s) for gliding to a new position; shorter during replays. */
+  glide?: number
+  /** Hide the hover tooltip (e.g. while a memory card is open). */
+  hideTooltip?: boolean
 }
 
 export interface CometHandle {
@@ -28,7 +32,7 @@ export interface CometHandle {
   look: CometLook
 }
 
-export const Comet = forwardRef<CometHandle, Props>(function Comet({ state, history, isLoading, demo }, ref) {
+export const Comet = forwardRef<CometHandle, Props>(function Comet({ state, history, isLoading, demo, glide = 1.4, hideTooltip = false }, ref) {
   const [hovered, setHovered] = useState(false)
   const group = useRef<THREE.Group>(null)
   const look = useRef(createLook())
@@ -63,7 +67,7 @@ export const Comet = forwardRef<CometHandle, Props>(function Comet({ state, hist
       toWorld(state.personality, targetPos)
       emotionColor(state.emotion, targetColor)
       // A slow glide, so each answer reads as travel with the camera following.
-      easing.damp3(g.position, targetPos, 1.4, delta)
+      easing.damp3(g.position, targetPos, glide, delta)
       easing.damp(l, 'energy', energyGlow(state.emotion.lightness), 0.6, delta)
       easing.damp(l, 'spread', meanUncertainty(state.uncertainty), 0.6, delta)
     }
@@ -87,9 +91,9 @@ export const Comet = forwardRef<CometHandle, Props>(function Comet({ state, hist
 
   return (
     <group ref={group} onPointerOver={() => setHovered(true)} onPointerOut={() => setHovered(false)}>
-      {/* Invisible hit area so hover is easy to trigger */}
+      {/* Invisible hit area so hover is easy to trigger; small enough not to cover nearby memory stars */}
       <mesh visible={false}>
-        <sphereGeometry args={[0.6, 8, 4]} />
+        <sphereGeometry args={[0.3, 8, 4]} />
       </mesh>
 
       <IonTail look={look.current} />
@@ -97,7 +101,7 @@ export const Comet = forwardRef<CometHandle, Props>(function Comet({ state, hist
       <Coma look={look.current} />
       <Nucleus look={look.current} />
 
-      {hovered && state && !demo && (
+      {hovered && !hideTooltip && state && !demo && (
         <Html position={[0.6, 0.6, 0]} distanceFactor={7} zIndexRange={[100, 0]} style={{ pointerEvents: 'none' }}>
           <div className="nucleus-tooltip">
             <div className="nt-section">

@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState, useCallback, useMemo } from 'react'
+import { lazy, Suspense, useState, useCallback } from 'react'
 import { Scene } from './components/Scene'
 import { ChatPanel } from './components/ChatPanel'
 import { IntroFlow, INTRO_COMPLETE_AT } from './components/IntroFlow'
@@ -24,11 +24,10 @@ export default function App() {
   // Returning visitors with a saved comet skip straight to the sky.
   const [phase, setPhase]               = useState<AppPhase>(() => (entries.length > 0 || DEBUG ? 'main' : 'intro'))
   const [introExiting, setIntroExiting] = useState(false)
+  // First-time visitors get the fly-in from deep space.
+  const [flyIn] = useState(() => entries.length === 0 && !DEBUG)
   const [chatOpen, setChatOpen]         = useState(false)
 
-  const history = useMemo(() => entries.map((e) => e.state), [entries])
-  const state = debugComet ?? history.at(-1) ?? null
-  const demo = state === null
   // The axes stay hidden until every question is answered (always shown in ?debug).
   const revealed = DEBUG || isMapRevealed(entries.length)
 
@@ -64,7 +63,7 @@ export default function App() {
       {/* Chat panel — hidden until user opens it */}
       <div className={`chat-panel-wrapper ${chatOpen ? 'chat-panel-wrapper--open' : ''}`}>
         <ChatPanel
-          state={state}
+          state={debugComet ?? entries.at(-1)?.state ?? null}
           entries={entries}
           promptSuggestion={nextPrompt}
           isLoading={isLoading}
@@ -77,7 +76,15 @@ export default function App() {
 
       {/* 3D scene — always rendered */}
       <div className="scene-container">
-        <Scene state={state} history={debugComet ? [] : history} isLoading={isLoading} demo={demo} chartMode={chartMode} revealed={revealed} />
+        <Scene
+          entries={entries}
+          debugState={debugComet}
+          isLoading={isLoading}
+          chartMode={chartMode}
+          revealed={revealed}
+          showControls={phase === 'main'}
+          flyIn={flyIn}
+        />
       </div>
 
       {/* Floating toggle button — visible in main phase when panel is closed */}
