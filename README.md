@@ -126,10 +126,11 @@ The prompt flow is ordered to build trust and extract progressively richer signa
 |---|---|
 | Nucleus position | Personality (x/y/z) |
 | Coma colour | Emotion hue and intensity |
-| Glow size and brightness | Energy |
-| Haze around the coma | Uncertainty: wide at first, tightening as evidence builds |
-| Jets | Depth per interest domain, along that domain's direction |
-| Tail | The path through every observation so far, in the colour of each moment |
+| Coma and nucleus brightness, coma size | Energy |
+| Coma churn and spread | Uncertainty: turbulent at first, calming as evidence builds |
+| Particle jets | Depth per interest domain, streaming along that domain's direction |
+| Dust tail | The path through every observation so far, in the colour of each moment, scattering as it ages |
+| Ion tail | The current heading: a straight plasma streak pointing back along the latest move |
 
 Personality is estimated with a per-axis Kalman filter, so repeated readings converge on
 where the person sits instead of drifting to the edge of the space.

@@ -1,118 +1,88 @@
 import { forwardRef, useImperativeHandle, useMemo, useRef, useState } from 'react'
-import { Billboard, Html } from '@react-three/drei'
+import { Html } from '@react-three/drei'
 import { useFrame } from '@react-three/fiber'
 import { easing } from 'maath'
 import * as THREE from 'three'
+import { Coma } from './comet/Coma'
+import { IonTail } from './comet/IonTail'
+import { Jets } from './comet/Jets'
+import { Nucleus } from './comet/Nucleus'
 import { emotionColor, emotionCss, energyGlow } from '../lib/color'
-import { createGlowTexture } from '../lib/textures'
+import { createLook, headingFrom, type CometLook } from '../lib/comet'
 import type { CometState } from '../lib/schema'
-import { AXES, DOMAINS, domainColor } from '../lib/spec'
+import { AXES, domainColor } from '../lib/spec'
 import { meanUncertainty, toWorld } from '../lib/tail'
 
-const UP = new THREE.Vector3(0, 1, 0)
-const JET_MIN = 0.06
-const JET_MAX = 1.5
-
-function useGlowTexture() {
-  return useMemo(() => createGlowTexture(), [])
-}
-
-// A cone with its base at the nucleus and its tip one unit out along +y.
-function useJetGeometry() {
-  return useMemo(() => new THREE.ConeGeometry(0.045, 1, 10, 1, true).translate(0, 0.5, 0), [])
-}
+const NO_INTERESTS: Record<string, number> = {}
 
 interface Props {
   state: CometState | null
+  /** Observations so far, oldest first; drives the heading. */
+  history: CometState[]
   isLoading: boolean
   demo: boolean
 }
 
 export interface CometHandle {
   group: THREE.Group | null
-  color: THREE.Color
+  look: CometLook
 }
 
-export const Comet = forwardRef<CometHandle, Props>(function Comet({ state, isLoading, demo }, ref) {
+export const Comet = forwardRef<CometHandle, Props>(function Comet({ state, history, isLoading, demo }, ref) {
   const [hovered, setHovered] = useState(false)
   const group = useRef<THREE.Group>(null)
-  const coma = useRef<THREE.Sprite>(null)
-  const halo = useRef<THREE.Sprite>(null)
-  const nucleus = useRef<THREE.MeshBasicMaterial>(null)
-  const jets = useRef<(THREE.Mesh | null)[]>([])
+  const look = useRef(createLook())
 
-  const color = useRef(new THREE.Color().setHSL(0.55, 0.6, 0.6))
   const targetColor = useMemo(() => new THREE.Color(), [])
   const targetPos = useMemo(() => new THREE.Vector3(), [])
-  const glow = useRef({ energy: 1, spread: 1 })
-
-  const glowTexture = useGlowTexture()
-  const jetGeometry = useJetGeometry()
-  const jetQuats = useMemo(
-    () => DOMAINS.map((d) => new THREE.Quaternion().setFromUnitVectors(UP, new THREE.Vector3(...d.direction).normalize())),
-    [],
-  )
+  const previous = useMemo(() => new THREE.Vector3(), [])
+  const targetHeading = useMemo(() => new THREE.Vector3(0, 1, 0), [])
+  const historyHeading = useMemo(() => headingFrom(history), [history])
 
   useImperativeHandle(ref, () => ({
     get group() {
       return group.current
     },
-    color: color.current,
+    look: look.current,
   }))
 
   useFrame(({ clock }, delta) => {
     const g = group.current
     if (!g) return
+    const l = look.current
     const t = clock.getElapsedTime()
+    previous.copy(g.position)
 
     if (demo || !state) {
       targetPos.set(Math.cos(t * 0.28) * 1.6, Math.sin(t * 0.17) * 1.0, Math.sin(t * 0.41) * 1.3)
       targetColor.setHSL((t * 0.055) % 1, 0.75, 0.65)
       easing.damp3(g.position, targetPos, 1.2, delta)
-      easing.damp(glow.current, 'energy', 1, 0.5, delta)
-      easing.damp(glow.current, 'spread', 0.6, 0.5, delta)
+      easing.damp(l, 'energy', 1, 0.5, delta)
+      easing.damp(l, 'spread', 0.6, 0.5, delta)
     } else {
       toWorld(state.personality, targetPos)
       emotionColor(state.emotion, targetColor)
       easing.damp3(g.position, targetPos, 0.6, delta)
-      easing.damp(glow.current, 'energy', energyGlow(state.emotion.lightness), 0.6, delta)
-      easing.damp(glow.current, 'spread', meanUncertainty(state.uncertainty), 0.6, delta)
+      easing.damp(l, 'energy', energyGlow(state.emotion.lightness), 0.6, delta)
+      easing.damp(l, 'spread', meanUncertainty(state.uncertainty), 0.6, delta)
     }
-    easing.dampC(color.current, targetColor, 0.5, delta)
+    easing.dampC(l.color, targetColor, 0.5, delta)
 
-    const pulse = isLoading ? 0.75 + 0.25 * Math.sin(t * 5) : 1
-    const { energy, spread } = glow.current
+    if (delta > 0) l.velocity.subVectors(g.position, previous).divideScalar(delta)
+    // Heading: the last move between observations, or the live motion in demo mode.
+    if (historyHeading && !demo) targetHeading.copy(historyHeading)
+    else if (l.velocity.lengthSq() > 1e-4) targetHeading.copy(l.velocity).normalize()
+    easing.damp3(l.heading, targetHeading, 0.4, delta)
+    if (l.heading.lengthSq() > 1e-8) l.heading.normalize()
 
-    if (nucleus.current) nucleus.current.color.copy(color.current).lerp(WHITE, 0.6).multiplyScalar(2.2 * energy * pulse)
-    if (coma.current) {
-      coma.current.scale.setScalar(0.55 + 0.35 * energy)
-      ;(coma.current.material as THREE.SpriteMaterial).color.copy(color.current).multiplyScalar(1.3 * energy * pulse)
-    }
-    if (halo.current) {
-      // An uncertain estimate is drawn as a wide, diffuse halo that tightens with evidence.
-      halo.current.scale.setScalar(1.1 + 2.2 * spread)
-      const m = halo.current.material as THREE.SpriteMaterial
-      m.color.copy(color.current)
-      m.opacity = (0.18 + 0.12 * (1 - spread)) * pulse
-    }
-
-    DOMAINS.forEach((d, i) => {
-      const jet = jets.current[i]
-      if (!jet) return
-      const depth = demo || !state ? 0 : (state.interests[d.id] ?? 0)
-      const target = depth > 0.01 ? JET_MIN + depth * (JET_MAX - JET_MIN) : 0.0001
-      easing.damp(jet.scale, 'y', target, 0.8, delta)
-      jet.visible = jet.scale.y > 0.002
-      ;(jet.material as THREE.MeshBasicMaterial).opacity = 0.55 + 0.2 * Math.sin(t * 3 + i * 1.7)
-    })
+    l.pulse = isLoading ? 0.75 + 0.25 * Math.sin(t * 5) : 1
   })
 
-  const topInterests = state
-    ? Object.entries(state.interests)
-        .filter(([, d]) => d > 0.05)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 5)
-    : []
+  const interests = demo || !state ? NO_INTERESTS : state.interests
+  const topInterests = Object.entries(interests)
+    .filter(([, d]) => d > 0.05)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
 
   return (
     <group ref={group} onPointerOver={() => setHovered(true)} onPointerOut={() => setHovered(false)}>
@@ -121,40 +91,10 @@ export const Comet = forwardRef<CometHandle, Props>(function Comet({ state, isLo
         <sphereGeometry args={[0.6, 8, 4]} />
       </mesh>
 
-      <mesh>
-        <sphereGeometry args={[0.05, 16, 8]} />
-        <meshBasicMaterial ref={nucleus} toneMapped={false} />
-      </mesh>
-
-      <Billboard>
-        <sprite ref={halo}>
-          <spriteMaterial map={glowTexture} transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
-        </sprite>
-        <sprite ref={coma}>
-          <spriteMaterial map={glowTexture} transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
-        </sprite>
-      </Billboard>
-
-      {DOMAINS.map((d, i) => (
-        <mesh
-          key={d.id}
-          ref={(m) => {
-            jets.current[i] = m
-          }}
-          geometry={jetGeometry}
-          quaternion={jetQuats[i]}
-          scale={[1, 0.0001, 1]}
-          visible={false}
-        >
-          <meshBasicMaterial
-            color={new THREE.Color(d.color).multiplyScalar(1.6)}
-            transparent
-            depthWrite={false}
-            blending={THREE.AdditiveBlending}
-            toneMapped={false}
-          />
-        </mesh>
-      ))}
+      <IonTail look={look.current} />
+      <Jets look={look.current} interests={interests} />
+      <Coma look={look.current} />
+      <Nucleus look={look.current} />
 
       {hovered && state && !demo && (
         <Html position={[0.6, 0.6, 0]} distanceFactor={7} zIndexRange={[100, 0]} style={{ pointerEvents: 'none' }}>
@@ -211,5 +151,3 @@ export const Comet = forwardRef<CometHandle, Props>(function Comet({ state, isLo
     </group>
   )
 })
-
-const WHITE = new THREE.Color('white')

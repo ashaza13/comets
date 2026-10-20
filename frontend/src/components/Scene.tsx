@@ -81,7 +81,7 @@ export function Scene({ state, history, isLoading, demo, chartMode }: Props) {
   const comet = useRef<CometHandle>(null)
   // Stable refs into the comet handle for the tail, which reads them every frame.
   const head = useMemo(() => ({ get current() { return comet.current?.group ?? null } }), [])
-  const headColor = useMemo(() => ({ get current() { return comet.current?.color ?? new THREE.Color() } }), [])
+  const look = useMemo(() => ({ get current() { return comet.current?.look ?? null } }), [])
   const tint = useMemo(() => moodTint(history, state), [history, state])
 
   return (
@@ -91,8 +91,8 @@ export function Scene({ state, history, isLoading, demo, chartMode }: Props) {
       <Starfield />
       <Dust />
       <Constellations chartMode={chartMode} />
-      <Tail history={history} head={head} headColor={headColor} />
-      <Comet ref={comet} state={state} isLoading={isLoading} demo={demo} />
+      <Tail history={history} head={head} look={look} />
+      <Comet ref={comet} state={state} history={history} isLoading={isLoading} demo={demo} />
 
       <IdleOrbit demo={demo} />
 
