@@ -7,14 +7,15 @@ import * as THREE from 'three'
 import { CameraRig, type CameraMode } from './CameraRig'
 import { Comet, type CometHandle } from './Comet'
 import { Constellations } from './Constellations'
-import { Dust } from './Dust'
 import { Flare } from './Flare'
 import { MemoryStars } from './MemoryStars'
 import { Nebula } from './Nebula'
+import { SpaceDust } from './SpaceDust'
 import { Starfield } from './Starfield'
 import { Tail } from './Tail'
 import { Timeline } from './Timeline'
 import { emotionColor } from '../lib/color'
+import { journeyBounds } from '../lib/tail'
 import { createNanGuardPass } from '../lib/nanGuard'
 import { historyAt } from '../lib/playback'
 import { INITIAL_STATE, type CometState, type Entry } from '../lib/schema'
@@ -57,6 +58,7 @@ export function Scene({ entries, debugState, isLoading, chartMode, revealed, sho
 
   const fullHistory = useMemo(() => entries.map((e) => e.state), [entries])
   const total = entries.length
+  const mapFrame = useMemo(() => journeyBounds(fullHistory), [fullHistory])
 
   // Playhead over the journey: null is live; a number replays up to that point.
   const [playhead, setPlayhead] = useState<number | null>(null)
@@ -101,7 +103,8 @@ export function Scene({ entries, debugState, isLoading, chartMode, revealed, sho
   const demo = state === null
   // The axes appear once the reveal replay has finished; later scrubbing keeps them.
   const mapShown = revealed && !replay?.reveal
-  const cameraMode: CameraMode = revealed ? 'map' : demo ? 'demo' : 'journey'
+  // ?debug tunes the comet up close, so it follows the comet even though the map is shown.
+  const cameraMode: CameraMode = debugState ? 'journey' : revealed ? 'map' : demo ? 'demo' : 'journey'
   const tint = useMemo(() => moodTint(history, state), [history, state])
 
   // Memory stars for answers already passed; the live comet itself marks the latest.
@@ -110,11 +113,11 @@ export function Scene({ entries, debugState, isLoading, chartMode, revealed, sho
 
   return (
     <>
-      <Canvas camera={{ position: [4.6, 2.4, 6.4], fov: 50 }} gl={{ antialias: true }} style={{ background: '#04040a' }}>
+      <Canvas camera={{ position: [4.6, 2.4, 6.4], fov: 50, far: 2000 }} gl={{ antialias: true }} style={{ background: '#04040a' }}>
         <AdaptiveDpr pixelated={false} />
         <Nebula tint={tint} />
         <Starfield />
-        <Dust />
+        <SpaceDust />
         <Constellations chartMode={chartMode} revealed={mapShown} />
         <Tail history={history} head={head} look={look} />
         <MemoryStars entries={memories} total={total} interactive={mapShown} onHoverChange={setMemoryOpen} />
@@ -129,7 +132,7 @@ export function Scene({ entries, debugState, isLoading, chartMode, revealed, sho
         />
         <Flare count={total} head={head} look={look} />
 
-        <CameraRig mode={cameraMode} head={head} flyIn={flyIn} />
+        <CameraRig mode={cameraMode} head={head} flyIn={flyIn} mapFrame={mapFrame} />
 
         <EffectComposer multisampling={4}>
           {/* Must run before bloom, which would otherwise smear one bad pixel over the frame. */}

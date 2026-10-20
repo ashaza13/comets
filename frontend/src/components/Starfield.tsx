@@ -10,12 +10,13 @@ import { useReducedMotion } from '../hooks/useReducedMotion'
  * Twinkling stars at a range of depths (so they parallax as the camera moves),
  * coloured by temperature and concentrated along the galactic band.
  */
-export function Starfield({ count = 7000 }: { count?: number }) {
+export function Starfield({ count = 9000 }: { count?: number }) {
   const material = useRef<THREE.ShaderMaterial>(null)
   const pixelRatio = useThree((s) => s.viewport.dpr)
   const reducedMotion = useReducedMotion()
 
-  const stars = useMemo(() => generateStars({ count }), [count])
+  // Spread far beyond the map so nearer stars drift past as the comet travels.
+  const stars = useMemo(() => generateStars({ count, minRadius: 70, maxRadius: 600 }), [count])
   const uniforms = useMemo(
     () => ({
       uTime: { value: 0 },

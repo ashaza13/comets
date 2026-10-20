@@ -4,13 +4,15 @@ import { useFrame } from '@react-three/fiber'
 import { easing } from 'maath'
 import * as THREE from 'three'
 import fontUrl from '@fontsource/space-mono/files/space-mono-latin-400-normal.woff?url'
-import { AXES, type Axis, type Vec3Tuple } from '../lib/spec'
+import { AXES, SPACE_SCALE, type Axis, type Vec3Tuple } from '../lib/spec'
 import { axisLabelVisibility } from '../lib/sky'
 import { createGlowTexture } from '../lib/textures'
 
-const EXTENT = 2.8
-const DOT_SPACING = 0.11
-const RING_RADIUS = 3
+const EXTENT = SPACE_SCALE * 1.55
+const DOT_SPACING = EXTENT / 25
+const RING_RADIUS = SPACE_SCALE * 1.67
+// Label height as a fraction of its distance from the camera.
+const LABEL_SIZE = 0.022
 
 const UNIT: Record<Axis['key'], THREE.Vector3> = {
   x: new THREE.Vector3(1, 0, 0),
@@ -53,10 +55,12 @@ function ConstellationAxis({ axis, chartMode, revealed, glow }: FadeProps & { ax
   const dotMaterial = useRef<THREE.PointsMaterial>(null)
   const line = useRef<Line2>(null)
   const labels = useRef<(TextMesh | null)[]>([])
+  const labelGroups = useRef<(THREE.Group | null)[]>([])
   const group = useRef<THREE.Group>(null)
   const poles = useRef<(THREE.SpriteMaterial | null)[]>([])
   const fade = useRef({ chart: chartMode ? 1 : 0, reveal: revealed ? 1 : 0 })
   const viewDir = useMemo(() => new THREE.Vector3(), [])
+  const labelPos = useMemo(() => new THREE.Vector3(), [])
 
   const end = (sign: number, k: number) => dir.clone().multiplyScalar(sign * k).toArray() as Vec3Tuple
 
@@ -80,6 +84,13 @@ function ConstellationAxis({ axis, chartMode, revealed, glow }: FadeProps & { ax
     for (const label of labels.current) {
       if (label) label.fillOpacity = visible * reveal * (0.42 + 0.43 * chart)
     }
+    // Scale labels with their distance from the camera so they read at a
+    // constant size, whether the pole is far away or right beside the camera.
+    for (const g of labelGroups.current) {
+      if (!g) continue
+      g.getWorldPosition(labelPos)
+      g.scale.setScalar(camera.position.distanceTo(labelPos) * LABEL_SIZE)
+    }
   })
 
   return (
@@ -88,8 +99,8 @@ function ConstellationAxis({ axis, chartMode, revealed, glow }: FadeProps & { ax
         <pointsMaterial
           ref={dotMaterial}
           map={glow}
-          size={0.05}
-          sizeAttenuation
+          size={4}
+          sizeAttenuation={false}
           vertexColors
           transparent
           depthWrite={false}
@@ -98,27 +109,33 @@ function ConstellationAxis({ axis, chartMode, revealed, glow }: FadeProps & { ax
       </points>
       <Line ref={line} points={[end(-1, EXTENT), end(1, EXTENT)]} color={axis.color} lineWidth={0.9} transparent opacity={0} />
       {([-1, 1] as const).map((sign, i) => (
-        <group key={sign} position={end(sign, EXTENT + 0.12)}>
-          {/* A small star marks each pole of the constellation. */}
-          <sprite scale={0.22}>
+        <group key={sign} position={end(sign, EXTENT)}>
+          {/* A small star marks each pole of the constellation (screen-sized). */}
+          <sprite scale={0.035}>
             <spriteMaterial
               ref={(m) => {
                 poles.current[i] = m
               }}
               map={glow}
               color={axis.color}
+              sizeAttenuation={false}
               transparent
               depthWrite={false}
               blending={THREE.AdditiveBlending}
             />
           </sprite>
-          <Billboard position={dir.clone().multiplyScalar(sign * 0.3).toArray() as Vec3Tuple}>
+          <Billboard
+            ref={(g) => {
+              labelGroups.current[i] = g
+            }}
+          >
             <Text
+              position={[0, -1.6, 0]}
               ref={(m: TextMesh | null) => {
                 labels.current[i] = m
               }}
               font={fontUrl}
-              fontSize={0.12}
+              fontSize={1}
               color={axis.color}
               anchorX="center"
               anchorY="middle"

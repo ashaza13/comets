@@ -23,8 +23,9 @@ const SAMPLES = 160
 const DEMO_LENGTH = 70
 const CURVE_TEXELS = SAMPLES + 1
 const DUST_PARTICLES = 6000
-// The ribbon is now the tail's thin bright spine; the dust particles give it body.
-const WIDTH = 0.07
+// The ribbon is the tail's thin bright spine (in screen pixels, so it stays
+// visible from the map's distance); the dust particles give it body.
+const WIDTH = 3
 
 // Thin at the oldest end, full width at the head.
 const taper = (p: number) => Math.pow(p, 1.6)
@@ -132,7 +133,7 @@ export function Tail({ history, head, look }: Props) {
         <meshLineMaterial
           ref={material}
           args={materialArgs}
-          sizeAttenuation={1}
+          sizeAttenuation={0}
           opacity={0.8}
           useMap={1}
           transparent

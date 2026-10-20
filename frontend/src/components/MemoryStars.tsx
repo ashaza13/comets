@@ -37,11 +37,12 @@ export function MemoryStars({ entries, total, interactive, onHoverChange }: Prop
         const isHovered = interactive && hovered === entry.id
         return (
           <group key={entry.id} position={position}>
-            <sprite scale={isHovered ? 0.34 : 0.2}>
-              <spriteMaterial map={glow} color={color} transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
+            {/* Screen-sized (no attenuation) so the stars stay visible from the map's distance. */}
+            <sprite scale={isHovered ? 0.05 : 0.032}>
+              <spriteMaterial map={glow} color={color} sizeAttenuation={false} transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
             </sprite>
-            <sprite scale={0.06}>
-              <spriteMaterial map={glow} color="white" transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
+            <sprite scale={0.01}>
+              <spriteMaterial map={glow} color="white" sizeAttenuation={false} transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
             </sprite>
             {interactive && (
               <mesh
@@ -54,11 +55,11 @@ export function MemoryStars({ entries, total, interactive, onHoverChange }: Prop
                   if (hovered === entry.id) setHovered(null)
                 }}
               >
-                <sphereGeometry args={[0.16, 8, 6]} />
+                <sphereGeometry args={[0.9, 8, 6]} />
               </mesh>
             )}
             {isHovered && (
-              <Html position={[0.25, 0.25, 0]} distanceFactor={7} zIndexRange={[100, 0]} style={{ pointerEvents: 'none' }}>
+              <Html position={[0.25, 0.25, 0]} zIndexRange={[100, 0]} style={{ pointerEvents: 'none' }}>
                 <div className="nucleus-tooltip memory-card">
                   <div className="nt-label">
                     answer {i + 1} of {total}

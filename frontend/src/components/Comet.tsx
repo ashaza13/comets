@@ -15,6 +15,10 @@ import { meanUncertainty, toWorld } from '../lib/tail'
 
 const NO_INTERESTS: Record<string, number> = {}
 
+function easeInOutCubic(x: number): number {
+  return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2
+}
+
 interface Props {
   state: CometState | null
   /** Observations so far, oldest first; drives the heading. */
@@ -41,6 +45,8 @@ export const Comet = forwardRef<CometHandle, Props>(function Comet({ state, hist
   const targetPos = useMemo(() => new THREE.Vector3(), [])
   const previous = useMemo(() => new THREE.Vector3(), [])
   const targetHeading = useMemo(() => new THREE.Vector3(0, 1, 0), [])
+  // The current voyage between two observed positions.
+  const travel = useRef({ from: new THREE.Vector3(), to: new THREE.Vector3(), startedAt: 0, duration: 1, active: false })
   const historyHeading = useMemo(() => headingFrom(history), [history])
 
   useImperativeHandle(ref, () => ({
@@ -66,8 +72,25 @@ export const Comet = forwardRef<CometHandle, Props>(function Comet({ state, hist
     } else {
       toWorld(state.personality, targetPos)
       emotionColor(state.emotion, targetColor)
-      // A slow glide, so each answer reads as travel with the camera following.
-      easing.damp3(g.position, targetPos, glide, delta)
+      const v = travel.current
+      if (glide < 1) {
+        // Replays and scrubbing: track the playhead closely.
+        easing.damp3(g.position, targetPos, glide, delta)
+        v.to.copy(targetPos)
+        v.active = false
+      } else {
+        // Each answer is a voyage: ease out of the old position, cruise, ease
+        // into the new one. Longer distances take longer, within limits.
+        if (!v.active || v.to.distanceToSquared(targetPos) > 1e-6) {
+          v.from.copy(g.position)
+          v.to.copy(targetPos)
+          v.startedAt = t
+          v.duration = THREE.MathUtils.clamp(1.6 + v.from.distanceTo(v.to) * 0.25, 2.2, 5)
+          v.active = true
+        }
+        const k = THREE.MathUtils.clamp((t - v.startedAt) / v.duration, 0, 1)
+        g.position.lerpVectors(v.from, v.to, easeInOutCubic(k))
+      }
       easing.damp(l, 'energy', energyGlow(state.emotion.lightness), 0.6, delta)
       easing.damp(l, 'spread', meanUncertainty(state.uncertainty), 0.6, delta)
     }
@@ -102,7 +125,7 @@ export const Comet = forwardRef<CometHandle, Props>(function Comet({ state, hist
       <Nucleus look={look.current} />
 
       {hovered && !hideTooltip && state && !demo && (
-        <Html position={[0.6, 0.6, 0]} distanceFactor={7} zIndexRange={[100, 0]} style={{ pointerEvents: 'none' }}>
+        <Html position={[0.6, 0.6, 0]} zIndexRange={[100, 0]} style={{ pointerEvents: 'none' }}>
           <div className="nucleus-tooltip">
             <div className="nt-section">
               <div className="nt-label">position</div>

@@ -35,3 +35,12 @@ export function tailTexture(history: CometState[], minAlpha = 0.12): Uint8Array 
 export function meanUncertainty(u: CometState['uncertainty']): number {
   return (u.x + u.y + u.z) / 3
 }
+
+/**
+ * Bounding sphere of the journey (origin plus every observation), used to frame
+ * the map so the path fills the view however far or near it travelled.
+ */
+export function journeyBounds(history: CometState[]): THREE.Sphere {
+  const points = [new THREE.Vector3(), ...history.map((s) => toWorld(s.personality))]
+  return new THREE.Box3().setFromPoints(points).getBoundingSphere(new THREE.Sphere())
+}

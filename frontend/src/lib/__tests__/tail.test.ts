@@ -2,7 +2,7 @@ import * as THREE from 'three'
 import { describe, expect, it } from 'vitest'
 import { INITIAL_STATE, type CometState } from '../schema'
 import { SPACE_SCALE } from '../spec'
-import { tailControlPoints, tailTexture } from '../tail'
+import { journeyBounds, tailControlPoints, tailTexture } from '../tail'
 
 const at = (x: number, hue = 200): CometState => ({
   ...INITIAL_STATE,
@@ -33,5 +33,14 @@ describe('tailTexture', () => {
     expect(data).toHaveLength(3 * 4)
     expect(data[3]).toBeLessThan(data[7])
     expect(data[11]).toBe(255)
+  })
+})
+
+describe('journeyBounds', () => {
+  it('encloses the origin and every observation', () => {
+    const sphere = journeyBounds([at(1), at(-0.5)])
+    for (const x of [0, SPACE_SCALE, -0.5 * SPACE_SCALE]) {
+      expect(sphere.distanceToPoint(new THREE.Vector3(x, 0, 0))).toBeLessThanOrEqual(1e-6)
+    }
   })
 })

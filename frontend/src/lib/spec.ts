@@ -24,8 +24,9 @@ export const DOMAINS = spec.domains as Domain[]
 export const DOMAIN_BY_ID: Record<string, Domain> = Object.fromEntries(DOMAINS.map((d) => [d.id, d]))
 export const PROMPTS: string[] = spec.stages.flatMap((s) => s.prompts)
 
-// Personality coordinates (−1…1) are scaled by this to world units.
-export const SPACE_SCALE = 1.8
+// Personality coordinates (−1…1) are scaled by this to world units. Large
+// enough that each answer is a real voyage relative to the comet's size.
+export const SPACE_SCALE = 20
 
 export function domainColor(id: string): string {
   return DOMAIN_BY_ID[id]?.color ?? '#999'

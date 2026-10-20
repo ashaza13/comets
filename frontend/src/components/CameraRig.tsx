@@ -12,7 +12,10 @@ import { useReducedMotion } from '../hooks/useReducedMotion'
  */
 export type CameraMode = 'demo' | 'journey' | 'map'
 
-const DISTANCE: Record<CameraMode, number> = { demo: 8.4, journey: 6.2, map: 9.5 }
+// Framing distance per mode; the map's comes from the journey's size.
+const DISTANCE: Record<Exclude<CameraMode, 'map'>, number> = { demo: 8.4, journey: 6.5 }
+const ZOOM_LIMIT: Record<CameraMode, number> = { demo: 14, journey: 14, map: 160 }
+const MAP_MIN_DISTANCE = 16
 // How long the camera eases towards a mode's framing distance after the mode changes.
 const FRAMING_SECONDS = 3
 const IDLE_RESUME_SECONDS = 4
@@ -20,24 +23,37 @@ const ORIGIN = new THREE.Vector3()
 
 type Controls = React.ComponentRef<typeof OrbitControls>
 
+function framingDistance(mode: CameraMode, frame: THREE.Sphere | undefined): number {
+  if (mode !== 'map') return DISTANCE[mode]
+  // Fit the journey's bounding sphere in view, with some margin.
+  const halfFov = THREE.MathUtils.degToRad(BASE_FOV / 2)
+  const fit = ((frame?.radius ?? 0) / Math.sin(halfFov)) * 1.25
+  return Math.min(Math.max(fit, MAP_MIN_DISTANCE), ZOOM_LIMIT.map - 10)
+}
+
 interface Props {
   mode: CameraMode
   head: RefObject<THREE.Group | null>
   /** Start far out in space and glide in. */
   flyIn?: boolean
+  /** Bounding sphere of the journey, framed in map mode. */
+  mapFrame?: THREE.Sphere
 }
 
 const FLY_IN_SCALE = 5
 const FLY_IN_SECONDS = 6
-const MAX_DISTANCE = 14
+const BASE_FOV = 50
+// Extra field of view at full speed, for a sense of acceleration.
+const WARP_FOV = 14
 
-export function CameraRig({ mode, head, flyIn = false }: Props) {
+export function CameraRig({ mode, head, flyIn = false, mapFrame }: Props) {
   const controls = useRef<Controls>(null)
   // endedAt is null until the frame loop stamps it with the clock's time.
   const interaction = useRef<{ active: boolean; endedAt: number | null }>({ active: false, endedAt: -Infinity })
   const framing = useRef<{ mode: CameraMode | null; until: number }>({ mode: null, until: 0 })
   const reducedMotion = useReducedMotion()
   const tmp = useMemo(() => ({ goal: new THREE.Vector3(), before: new THREE.Vector3(), offset: new THREE.Vector3() }), [])
+  const motion = useRef({ last: new THREE.Vector3(), speed: 0, started: false })
 
   useFrame(({ camera, clock }, delta) => {
     const c = controls.current
@@ -50,10 +66,7 @@ export function CameraRig({ mode, head, flyIn = false }: Props) {
     // view or, for a fly-in, start far out and glide to the mode's distance.
     if (framing.current.mode !== mode) {
       const first = framing.current.mode === null
-      if (first && flyIn && !reducedMotion) {
-        c.maxDistance = Infinity
-        camera.position.multiplyScalar(FLY_IN_SCALE)
-      }
+      if (first && flyIn && !reducedMotion) camera.position.multiplyScalar(FLY_IN_SCALE)
       framing.current = { mode, until: first ? (flyIn ? now + FLY_IN_SECONDS : 0) : now + FRAMING_SECONDS }
     }
 
@@ -61,6 +74,7 @@ export function CameraRig({ mode, head, flyIn = false }: Props) {
     // the same amount, so the user's chosen angle and zoom are kept.
     const { goal, before, offset } = tmp
     if (mode === 'journey' && head.current) goal.copy(head.current.position)
+    else if (mode === 'map' && mapFrame) goal.copy(mapFrame.center)
     else goal.copy(ORIGIN)
     before.copy(c.target)
     easing.damp3(c.target, goal, mode === 'journey' ? 0.6 : 1.4, delta)
@@ -70,12 +84,31 @@ export function CameraRig({ mode, head, flyIn = false }: Props) {
     if (now < framing.current.until && !active && !reducedMotion) {
       offset.subVectors(camera.position, c.target)
       const length = { v: offset.length() }
-      easing.damp(length, 'v', DISTANCE[mode], 1.2, delta)
+      easing.damp(length, 'v', framingDistance(mode, mapFrame), 1.2, delta)
       camera.position.copy(c.target).addScaledVector(offset.normalize(), length.v)
     }
 
-    // Restore the zoom limit once a fly-in has come back within it.
-    if (c.maxDistance > MAX_DISTANCE && camera.position.distanceTo(c.target) <= MAX_DISTANCE) c.maxDistance = MAX_DISTANCE
+    // Zoom limit for the mode, but never below the current distance, so mode
+    // changes and the fly-in glide in rather than snapping.
+    c.maxDistance = Math.max(ZOOM_LIMIT[mode], camera.position.distanceTo(c.target) + 0.01)
+
+    // Widen the view slightly while the comet is travelling fast.
+    const m = motion.current
+    if (head.current && delta > 0) {
+      if (!m.started) {
+        m.last.copy(head.current.position)
+        m.started = true
+      }
+      const speed = head.current.position.distanceTo(m.last) / delta
+      m.last.copy(head.current.position)
+      easing.damp(m, 'speed', speed, 0.4, delta)
+    }
+    const perspective = camera as THREE.PerspectiveCamera
+    const fov = mode === 'journey' && !reducedMotion ? BASE_FOV + WARP_FOV * THREE.MathUtils.smoothstep(m.speed, 0.5, 8) : BASE_FOV
+    if (Math.abs(perspective.fov - fov) > 0.01) {
+      easing.damp(perspective, 'fov', fov, 0.5, delta)
+      perspective.updateProjectionMatrix()
+    }
 
     const idle = !active && now - endedAt > IDLE_RESUME_SECONDS
     const spin = reducedMotion || !idle ? 0 : mode === 'demo' ? 0.5 : 0.2
@@ -90,7 +123,7 @@ export function CameraRig({ mode, head, flyIn = false }: Props) {
       enableDamping
       dampingFactor={0.06}
       minDistance={3}
-      maxDistance={MAX_DISTANCE}
+      maxDistance={ZOOM_LIMIT.demo}
       autoRotate
       autoRotateSpeed={0}
       onStart={() => {

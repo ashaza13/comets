@@ -39,5 +39,5 @@ void main() {
   float on = step(0.01, depth);
   vAlpha = on * (1.0 - age) * smoothstep(0.0, 0.08, age) * (0.6 + 0.6 * depth);
   vColor = uColor[i];
-  gl_PointSize = min(on * (2.0 + 4.5 * (1.0 - age)) * uPixelRatio * (9.0 / max(-mv.z, 0.5)), 48.0);
+  gl_PointSize = min(on * (2.0 + 4.5 * (1.0 - age)) * uPixelRatio * max(9.0 / max(-mv.z, 0.5), 0.5), 48.0);
 }
