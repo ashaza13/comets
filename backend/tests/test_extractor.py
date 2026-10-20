@@ -21,10 +21,10 @@ class FakeMessages:
         return self.response
 
 
-def make(response):
+def make(response, **settings):
     messages = FakeMessages(response)
     client = SimpleNamespace(beta=SimpleNamespace(messages=messages))
-    return ClaudeExtractor(Settings(), client=client), messages
+    return ClaudeExtractor(Settings(**settings), client=client), messages
 
 
 def test_returns_parsed_output_and_sends_schema():
@@ -39,3 +39,12 @@ def test_refusal_raises():
     extract, _ = make(SimpleNamespace(stop_reason="refusal", parsed_output=None))
     with pytest.raises(ExtractionError):
         extract("hello", None)
+
+
+def test_litellm_style_model_id_is_accepted():
+    extract, messages = make(
+        SimpleNamespace(stop_reason="end_turn", parsed_output=READING), llm_model="anthropic/claude-sonnet-4-6"
+    )
+    extract("hello", None)
+    assert messages.kwargs["model"] == "claude-sonnet-4-6"
+    assert "fallbacks" not in messages.kwargs and "betas" not in messages.kwargs

@@ -36,6 +36,10 @@ than over-estimating.
 """
 
 
+# Models that accept the server-side refusal fallback; other models reject the parameter.
+_FALLBACK_MODELS = {"claude-fable-5-1", "claude-opus-5-5", "claude-opus-5", "claude-sonnet-5-5"}
+
+
 class Extractor(Protocol):
     def __call__(self, text: str, prompt: str | None) -> Observation: ...
 
@@ -56,6 +60,12 @@ class ClaudeExtractor:
 
     def __call__(self, text: str, prompt: str | None) -> Observation:
         s = self._settings
+        # Re-run a policy-declined request on Anthropic's recommended fallback model.
+        fallback = (
+            {"betas": ["server-side-fallback-2026-07-01"], "fallbacks": "default"}
+            if s.llm_model in _FALLBACK_MODELS
+            else {}
+        )
         try:
             response = self._client.beta.messages.parse(
                 model=s.llm_model,
@@ -64,9 +74,7 @@ class ClaudeExtractor:
                 messages=[{"role": "user", "content": build_user_message(text, prompt)}],
                 output_format=Observation,
                 output_config={"effort": s.llm_effort},
-                # Re-run a policy-declined request on Anthropic's recommended fallback model.
-                betas=["server-side-fallback-2026-07-01"],
-                fallbacks="default",
+                **fallback,
             )
         except anthropic.RateLimitError as e:
             raise ExtractionError("The model is busy right now — try again in a moment.") from e
