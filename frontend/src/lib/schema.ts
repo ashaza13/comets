@@ -31,18 +31,25 @@ export const ObserveResponseSchema = z.object({
   next_prompt: z.string().nullable(),
 })
 
+export const EntryKindSchema = z.enum(['mood', 'card', 'topics', 'text'])
+
 export const EntrySchema = z.object({
   id: z.string(),
+  /** What happened, in words: the free text, or a summary of the tap. */
   text: z.string(),
   prompt: z.string().nullable(),
   observation: ObservationSchema,
   state: CometStateSchema,
+  /** Journey step this answered; 'text' is optional free writing ("say more"). */
+  kind: EntryKindSchema,
+  cardId: z.string().optional(),
 })
 
 export type CometState = z.infer<typeof CometStateSchema>
 export type Observation = z.infer<typeof ObservationSchema>
 export type ObserveResponse = z.infer<typeof ObserveResponseSchema>
 export type Entry = z.infer<typeof EntrySchema>
+export type EntryKind = z.infer<typeof EntryKindSchema>
 
 export const INITIAL_STATE: CometState = {
   personality: { x: 0, y: 0, z: 0 },

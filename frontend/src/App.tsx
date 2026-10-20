@@ -1,8 +1,9 @@
 import { lazy, Suspense, useState, useCallback } from 'react'
 import { Scene } from './components/Scene'
 import { ChatPanel } from './components/ChatPanel'
-import { IntroFlow, INTRO_COMPLETE_AT } from './components/IntroFlow'
-import { isMapRevealed } from './lib/spec'
+import { IntroFlow } from './components/IntroFlow'
+import { JourneyPanel } from './components/journey/JourneyPanel'
+import { isJourneyComplete } from './lib/journey'
 import { useCometStore } from './store'
 
 type AppPhase = 'intro' | 'main'
@@ -12,7 +13,6 @@ const DebugPanel = lazy(() => import('./components/DebugPanel'))
 
 export default function App() {
   const entries      = useCometStore((s) => s.entries)
-  const nextPrompt   = useCometStore((s) => s.nextPrompt)
   const isLoading    = useCometStore((s) => s.isLoading)
   const error        = useCometStore((s) => s.error)
   const debugComet   = useCometStore((s) => s.debugComet)
@@ -28,22 +28,15 @@ export default function App() {
   const [flyIn] = useState(() => entries.length === 0 && !DEBUG)
   const [chatOpen, setChatOpen]         = useState(false)
 
-  // The axes stay hidden until every question is answered (always shown in ?debug).
-  const revealed = DEBUG || isMapRevealed(entries.length)
+  // The axes stay hidden until the journey is complete (always shown in ?debug).
+  const complete = isJourneyComplete(entries)
+  const revealed = DEBUG || complete
 
   const leaveIntro = useCallback(() => {
     setIntroExiting(true)
     setTimeout(() => setPhase('main'), 650)
   }, [])
 
-  // Transition out of intro after enough questions answered
-  const handleSend = useCallback(
-    async (text: string) => {
-      await send(text)
-      if (phase === 'intro' && useCometStore.getState().entries.length >= INTRO_COMPLETE_AT) leaveIntro()
-    },
-    [send, phase, leaveIntro],
-  )
 
   const handleReset = useCallback(() => {
     reset()
@@ -65,10 +58,10 @@ export default function App() {
         <ChatPanel
           state={debugComet ?? entries.at(-1)?.state ?? null}
           entries={entries}
-          promptSuggestion={nextPrompt}
+          exact={chartMode && revealed}
           isLoading={isLoading}
           error={error}
-          onSend={handleSend}
+          onSend={(text) => send(text, null)}
           onReset={handleReset}
           onClose={() => setChatOpen(false)}
         />
@@ -94,6 +87,8 @@ export default function App() {
         </button>
       )}
 
+      {phase === 'main' && !complete && !DEBUG && <JourneyPanel entries={entries} isLoading={isLoading} error={error} />}
+
       {phase === 'main' && revealed && (
         <button className="chart-toggle-btn" onClick={toggleChart} aria-pressed={chartMode}>
           {chartMode ? '✦ sky' : '◎ chart'}
@@ -102,15 +97,7 @@ export default function App() {
 
       {/* Intro overlay */}
       {phase === 'intro' && (
-        <IntroFlow
-          exiting={introExiting}
-          promptSuggestion={nextPrompt}
-          isLoading={isLoading}
-          error={error}
-          onSend={handleSend}
-          messageCount={entries.length}
-          onSkip={leaveIntro}
-        />
+        <IntroFlow exiting={introExiting} onDone={leaveIntro} />
       )}
     </div>
   )

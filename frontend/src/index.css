@@ -786,3 +786,235 @@ body {
     width: calc(100% - 32px);
   }
 }
+
+/* ── Journey panel (mood wheel, this-or-that cards, topics) ────────────────── */
+
+.journey {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  z-index: 25;
+  width: min(560px, calc(100% - 32px));
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  padding: 18px 20px 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  background: rgba(10, 10, 20, 0.78);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  backdrop-filter: blur(10px);
+  font-family: var(--mono);
+  color: var(--text);
+  animation: journey-in 0.5s ease-out;
+}
+
+@keyframes journey-in {
+  from { opacity: 0; transform: translate(-50%, 12px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+.journey-progress { display: flex; gap: 6px; }
+
+.journey-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--border);
+  transition: background 0.3s;
+}
+
+.journey-dot--done { background: var(--accent); }
+.journey-dot--now { background: #d0d0f8; }
+
+.journey-prompt {
+  font-size: 15px;
+  font-weight: 500;
+  text-align: center;
+  color: #e4e4fa;
+  margin: 0;
+}
+
+.journey-primary {
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: 999px;
+  padding: 9px 22px;
+  font-family: var(--mono);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.journey-primary:disabled { opacity: 0.35; cursor: default; }
+.journey-primary--small { padding: 6px 14px; }
+
+.journey-link {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-family: var(--mono);
+  font-size: 11px;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+
+.journey-link:hover { color: var(--text); }
+
+.journey-error { color: #ff8080; font-size: 11px; }
+
+/* Mood wheel */
+
+.mood { display: flex; flex-direction: column; align-items: center; gap: 12px; width: 100%; }
+
+.mood-wheel-wrap {
+  position: relative;
+  width: min(200px, 52vw);
+  aspect-ratio: 1;
+  margin: 14px 0 22px;
+}
+
+.mood-wheel {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  cursor: crosshair;
+  touch-action: none;
+  /* Grey at the centre (no strong feeling), full colour at the rim. */
+  background:
+    radial-gradient(circle, rgba(150, 150, 165, 1) 0%, rgba(150, 150, 165, 0) 72%),
+    conic-gradient(from 0deg, hsl(0 75% 55%), hsl(60 75% 55%), hsl(120 75% 50%), hsl(180 75% 50%),
+      hsl(240 75% 60%), hsl(300 75% 58%), hsl(360 75% 55%));
+  box-shadow: 0 0 40px rgba(120, 120, 200, 0.25);
+}
+
+.mood-marker {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  margin: -8px 0 0 -8px;
+  border-radius: 50%;
+  border: 2px solid white;
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
+  pointer-events: none;
+}
+
+.mood-label {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  font-size: 10px;
+  color: var(--text-dim);
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.mood-energy {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 10px;
+  color: var(--text-dim);
+  width: min(280px, 100%);
+}
+
+.mood-energy input { flex: 1; accent-color: var(--accent); }
+
+.mood-reading { font-size: 12px; color: #d0d0f8; min-height: 1.5em; }
+
+/* This-or-that */
+
+.choice { display: flex; flex-direction: column; align-items: center; gap: 10px; width: 100%; }
+
+.choice-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  width: 100%;
+}
+
+.choice-option {
+  min-height: 84px;
+  padding: 14px;
+  border-radius: 12px;
+  border: 1px solid #2a2a48;
+  background: rgba(30, 30, 56, 0.6);
+  color: #e4e4fa;
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.4;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, transform 0.1s;
+}
+
+.choice-option:hover { border-color: var(--accent); background: rgba(70, 70, 140, 0.35); }
+.choice-option:active { transform: scale(0.98); }
+
+/* Topics */
+
+.topics { display: flex; flex-direction: column; align-items: center; gap: 12px; width: 100%; }
+
+.topics-grid { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+
+.topic {
+  border: 1px solid color-mix(in srgb, var(--topic) 55%, transparent);
+  color: var(--topic);
+  background: transparent;
+  border-radius: 999px;
+  padding: 5px 11px;
+  font-family: var(--mono);
+  font-size: 11px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.topic--on {
+  background: color-mix(in srgb, var(--topic) 22%, transparent);
+  border-color: var(--topic);
+  opacity: 1 !important;
+}
+
+.topic-level { font-size: 9px; color: #e4e4fa; opacity: 0.8; }
+
+/* Say more */
+
+.saymore { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+
+.saymore-input {
+  width: 100%;
+  resize: none;
+  background: rgba(20, 20, 40, 0.8);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 8px 10px;
+}
+
+.saymore-actions { display: flex; justify-content: flex-end; align-items: center; gap: 10px; }
+
+.saymore-mic {
+  margin-right: auto;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.saymore-mic--on { border-color: #ff6b6b; color: #ff9b9b; }
+
+.message-prompt { color: var(--text-dim); font-size: 10px; margin-bottom: 2px; }
+
+@media (max-width: 640px) {
+  .journey { bottom: 76px; padding: 14px; }
+  .choice-option { min-height: 70px; font-size: 12px; }
+}

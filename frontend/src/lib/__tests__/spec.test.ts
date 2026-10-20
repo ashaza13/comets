@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { AXES, DOMAINS, PROMPTS, isMapRevealed } from '../spec'
+import { AXES, DOMAINS, PROMPTS } from '../spec'
 
 describe('spec', () => {
   it('defines the three axes in order', () => {
@@ -18,11 +18,3 @@ describe('spec', () => {
   })
 })
 
-describe('isMapRevealed', () => {
-  it('reveals the map only once every prompt is answered', () => {
-    expect(isMapRevealed(0)).toBe(false)
-    expect(isMapRevealed(PROMPTS.length - 1)).toBe(false)
-    expect(isMapRevealed(PROMPTS.length)).toBe(true)
-    expect(isMapRevealed(PROMPTS.length + 3)).toBe(true)
-  })
-})

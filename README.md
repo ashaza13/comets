@@ -134,10 +134,25 @@ The prompt flow is ordered to build trust and extract progressively richer signa
 
 ### The journey
 
+About a minute of taps, no typing required:
+
+1. **Mood wheel**: tap a colour; the angle is the kind of feeling, the distance from the centre how
+   strongly you feel it. A slider sets energy.
+2. **This-or-that cards** (8): two short scenes; tap the one that pulls you. Each option is pre-scored
+   on the personality axes (`frontend/src/lib/cards.ts`), and the next card is chosen to target the
+   axis the estimate is least sure about.
+3. **Topics**: tap what lights you up; tap again to go deeper (curious, into it, obsessed).
+
+Taps are scored in the browser with a TypeScript port of the backend's update math
+(`frontend/src/lib/estimate.ts`), so they apply instantly. A shared fixture
+(`backend/tests/fixtures/apply_observation.json`) keeps both implementations identical. Any step can
+take an optional **say more**, typed or dictated, which Claude reads on the backend.
+
 While you answer, the camera travels with the comet and the axes stay hidden; each answer fires a
-flare and the comet glides to its new position, leaving a memory star behind. After the last
-question the journey replays from the start, then the axes fade in around it. Hover a memory star to
-read that answer back, and use the timeline to scrub or replay the journey.
+flare and the comet glides to its new position, leaving a memory star behind. After the last step
+the journey replays from the start, then the axes fade in around it. Hover a memory star to read
+that answer back, and use the timeline to scrub or replay the journey. Readings are shown in plain
+language ("leaning introvert"); chart mode shows the exact numbers.
 
 Personality is estimated with a per-axis Kalman filter, so repeated readings converge on
 where the person sits instead of drifting to the edge of the space.

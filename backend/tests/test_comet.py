@@ -84,3 +84,16 @@ def test_state_stays_in_range(steps):
     assert 0.0 <= state.emotion.saturation <= 1.0
     assert 0.0 <= state.emotion.lightness <= 1.0
     assert all(0.0 <= v <= 1.0 for v in state.interests.values())
+
+
+def test_shared_fixture_matches_python():
+    """The fixture the frontend's TypeScript port is checked against must stay current."""
+    import json
+    from pathlib import Path
+
+    from app.signals.models import CometState as State
+
+    cases = json.loads((Path(__file__).parent / "fixtures" / "apply_observation.json").read_text())
+    for case in cases:
+        after = apply_observation(State.model_validate(case["state"]), Observation.model_validate(case["observation"]))
+        assert after.model_dump() == case["expected"]

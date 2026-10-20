@@ -8,6 +8,7 @@ import { IonTail } from './comet/IonTail'
 import { Jets } from './comet/Jets'
 import { Nucleus } from './comet/Nucleus'
 import { emotionColor, emotionCss, energyGlow } from '../lib/color'
+import { certaintyNote, describeAxis, describeDepth, describeEmotion } from '../lib/describe'
 import { createLook, headingFrom, type CometLook } from '../lib/comet'
 import type { CometState } from '../lib/schema'
 import { AXES, domainColor } from '../lib/spec'
@@ -29,6 +30,8 @@ interface Props {
   glide?: number
   /** Hide the hover tooltip (e.g. while a memory card is open). */
   hideTooltip?: boolean
+  /** Show exact numbers in the tooltip (chart mode) instead of plain language. */
+  exact?: boolean
 }
 
 export interface CometHandle {
@@ -36,7 +39,7 @@ export interface CometHandle {
   look: CometLook
 }
 
-export const Comet = forwardRef<CometHandle, Props>(function Comet({ state, history, isLoading, demo, glide = 1.4, hideTooltip = false }, ref) {
+export const Comet = forwardRef<CometHandle, Props>(function Comet({ state, history, isLoading, demo, glide = 1.4, hideTooltip = false, exact = false }, ref) {
   const [hovered, setHovered] = useState(false)
   const group = useRef<THREE.Group>(null)
   const look = useRef(createLook())
@@ -133,11 +136,17 @@ export const Comet = forwardRef<CometHandle, Props>(function Comet({ state, hist
                 const v = state.personality[a.key]
                 return (
                   <div key={a.key} className="nt-row">
-                    <span style={{ color: a.color }}>{v >= 0 ? a.positive : a.negative}</span>
-                    <span>
-                      {Math.abs(v).toFixed(2)}
-                      <span className="dim"> ±{Math.sqrt(state.uncertainty[a.key]).toFixed(2)}</span>
-                    </span>
+                    {exact ? (
+                      <>
+                        <span style={{ color: a.color }}>{v >= 0 ? a.positive : a.negative}</span>
+                        <span>
+                          {Math.abs(v).toFixed(2)}
+                          <span className="dim"> ±{Math.sqrt(state.uncertainty[a.key]).toFixed(2)}</span>
+                        </span>
+                      </>
+                    ) : (
+                      <span style={{ color: a.color }}>{certaintyNote(state.uncertainty[a.key]) === 'no read yet' ? '—' : describeAxis(a, v)}</span>
+                    )}
                   </div>
                 )
               })}
@@ -146,12 +155,13 @@ export const Comet = forwardRef<CometHandle, Props>(function Comet({ state, hist
             <div className="nt-divider" />
 
             <div className="nt-section">
-              <div className="nt-label">emotion</div>
+              <div className="nt-label">feeling</div>
               <div className="nt-row">
                 <div className="nt-swatch" style={{ background: emotionCss(state.emotion) }} />
                 <span style={{ color: emotionCss(state.emotion) }}>
-                  {state.emotion.hue.toFixed(0)}° · {(state.emotion.saturation * 100).toFixed(0)}% · energy{' '}
-                  {(state.emotion.lightness * 100).toFixed(0)}%
+                  {exact
+                    ? `${state.emotion.hue.toFixed(0)}° · ${(state.emotion.saturation * 100).toFixed(0)}% · energy ${(state.emotion.lightness * 100).toFixed(0)}%`
+                    : describeEmotion(state.emotion)}
                 </span>
               </div>
             </div>
@@ -160,14 +170,14 @@ export const Comet = forwardRef<CometHandle, Props>(function Comet({ state, hist
               <>
                 <div className="nt-divider" />
                 <div className="nt-section">
-                  <div className="nt-label">depth</div>
+                  <div className="nt-label">loves</div>
                   {topInterests.map(([domain, depth]) => (
                     <div key={domain} className="nt-row">
                       <span style={{ color: domainColor(domain), minWidth: 80 }}>{domain}</span>
                       <div className="nt-bar">
                         <div className="nt-bar-fill" style={{ width: `${depth * 100}%`, background: domainColor(domain) }} />
                       </div>
-                      <span className="dim">{depth.toFixed(2)}</span>
+                      <span className="dim">{exact ? depth.toFixed(2) : describeDepth(depth)}</span>
                     </div>
                   ))}
                 </div>

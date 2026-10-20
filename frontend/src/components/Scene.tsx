@@ -129,6 +129,7 @@ export function Scene({ entries, debugState, isLoading, chartMode, revealed, sho
           demo={demo}
           glide={replaying ? 0.3 : 1.4}
           hideTooltip={memoryOpen && mapShown}
+          exact={chartMode && mapShown}
         />
         <Flare count={total} head={head} look={look} />
 

@@ -65,7 +65,7 @@ export function MemoryStars({ entries, total, interactive, onHoverChange }: Prop
                     answer {i + 1} of {total}
                   </div>
                   {entry.prompt && <div className="memory-prompt">{clip(entry.prompt, 90)}</div>}
-                  <div className="memory-text">“{clip(entry.text, 180)}”</div>
+                  <div className="memory-text">{entry.kind === 'text' ? `“${clip(entry.text, 180)}”` : clip(entry.text, 180)}</div>
                   <div className="nt-divider" />
                   <div className="nt-row">
                     <div className="nt-swatch" style={{ background: emotionCss(entry.state.emotion) }} />
