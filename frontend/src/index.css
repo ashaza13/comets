@@ -124,6 +124,13 @@ body {
   align-items: flex-start;
 }
 
+.interests-row > span:last-child {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
 /* ── History ─────────────────────────────────────────────────────────────── */
 
 .chat-history {
@@ -415,19 +422,6 @@ body {
   opacity: 0.8;
 }
 
-/* ── Chat panel wrapper (slide-in on intro exit) ─────────────────────────── */
-
-.chat-panel-wrapper {
-  overflow: hidden;
-  width: 0;
-  flex-shrink: 0;
-  transition: width 0.7s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.chat-panel-wrapper--visible {
-  width: 340px;
-}
-
 /* ── Intro overlay ───────────────────────────────────────────────────────── */
 
 .intro-overlay {
@@ -676,3 +670,16 @@ body {
 
 .intro-q-submit:hover:not(:disabled) { opacity: 0.85; }
 .intro-q-submit:disabled { opacity: 0.3; cursor: default; }
+
+.chat-reset-btn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-dim);
+  font-family: var(--mono);
+  font-size: 10px;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+
+.chat-reset-btn:hover { color: var(--text); border-color: var(--text-dim); }

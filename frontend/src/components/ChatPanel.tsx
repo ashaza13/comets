@@ -1,48 +1,41 @@
-import { useRef, useEffect, useState } from 'react'
-import type { SessionState, SignalDeltas } from '../lib/types'
-import { DOMAIN_COLORS } from '../lib/domains'
+import { useEffect, useRef, useState } from 'react'
+import { emotionCss } from '../lib/color'
+import type { CometState, Entry, Observation } from '../lib/schema'
+import { AXES, domainColor } from '../lib/spec'
 
-function SignalReadout({ deltas }: { deltas: SignalDeltas }) {
-  const { personality: p, emotion: e, interests, confidence, reasoning } = deltas
-
-  const fmtDelta = (v: number) =>
-    v === 0 ? null : (
-      <span style={{ color: v > 0 ? '#6bffb8' : '#ff6b6b' }}>
-        {v > 0 ? '+' : ''}{v.toFixed(2)}
-      </span>
-    )
+function SignalReadout({ observation }: { observation: Observation }) {
+  const { personality: p, emotion: e, interests, confidence, reasoning } = observation
+  const axes = AXES.filter((a) => p[a.key] !== null)
 
   return (
     <div className="signal-readout">
       <div className="readout-row">
         <span className="dim">confidence</span>
-        <span style={{ color: `hsl(${confidence * 120}, 80%, 60%)` }}>
-          {(confidence * 100).toFixed(0)}%
-        </span>
+        <span style={{ color: `hsl(${confidence * 120}, 80%, 60%)` }}>{(confidence * 100).toFixed(0)}%</span>
       </div>
 
-      {(p.x !== 0 || p.y !== 0 || p.z !== 0) && (
+      {axes.length > 0 && (
         <div className="readout-row">
-          <span className="dim">position</span>
+          <span className="dim">reads as</span>
           <span>
-            x{fmtDelta(p.x)} y{fmtDelta(p.y)} z{fmtDelta(p.z)}
+            {axes.map((a) => {
+              const v = p[a.key]!
+              return (
+                <span key={a.key} style={{ color: a.color, marginLeft: 6 }}>
+                  {v >= 0 ? a.positive : a.negative} {Math.abs(v).toFixed(2)}
+                </span>
+              )
+            })}
           </span>
         </div>
       )}
 
-      {(e.hue !== null || e.saturation !== null) && (
+      {e.hue !== null && (
         <div className="readout-row">
           <span className="dim">emotion</span>
-          <span
-            style={{
-              color: e.hue !== null
-                ? `hsl(${e.hue}, ${(e.saturation ?? 0.5) * 100}%, 65%)`
-                : undefined,
-            }}
-          >
-            {e.hue !== null ? `hue ${e.hue.toFixed(0)}°` : '—'}
-            {e.saturation !== null ? ` sat ${(e.saturation * 100).toFixed(0)}%` : ''}
-            {e.lightness !== null ? ` lum ${(e.lightness * 100).toFixed(0)}%` : ''}
+          <span style={{ color: emotionCss({ hue: e.hue, saturation: e.saturation ?? 0.5 }) }}>
+            hue {e.hue.toFixed(0)}°{e.saturation !== null ? ` · ${(e.saturation * 100).toFixed(0)}%` : ''}
+            {e.lightness !== null ? ` · energy ${(e.lightness * 100).toFixed(0)}%` : ''}
           </span>
         </div>
       )}
@@ -53,9 +46,9 @@ function SignalReadout({ deltas }: { deltas: SignalDeltas }) {
             <span
               key={i.domain}
               className="interest-tag"
-              style={{ borderColor: DOMAIN_COLORS[i.domain] ?? '#666', color: DOMAIN_COLORS[i.domain] ?? '#aaa' }}
+              style={{ borderColor: domainColor(i.domain), color: domainColor(i.domain) }}
             >
-              {i.domain} {i.depth_delta > 0 ? '+' : ''}{i.depth_delta.toFixed(2)}
+              {i.domain} {i.depth.toFixed(2)}
             </span>
           ))}
         </div>
@@ -66,27 +59,30 @@ function SignalReadout({ deltas }: { deltas: SignalDeltas }) {
   )
 }
 
-function StatePanel({ state }: { state: SessionState }) {
+function StatePanel({ state }: { state: CometState }) {
   const topInterests = Object.entries(state.interests)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 5)
 
   return (
     <div className="state-panel">
-      <div className="state-row">
-        <span className="dim">position</span>
-        <span>
-          ({state.personality.x.toFixed(2)}, {state.personality.y.toFixed(2)}, {state.personality.z.toFixed(2)})
-        </span>
-      </div>
+      {AXES.map((a) => {
+        const v = state.personality[a.key]
+        return (
+          <div key={a.key} className="state-row">
+            <span className="dim">{a.name}</span>
+            <span style={{ color: a.color }}>
+              {v >= 0 ? a.positive : a.negative} {Math.abs(v).toFixed(2)}
+              <span className="dim"> ±{Math.sqrt(state.uncertainty[a.key]).toFixed(2)}</span>
+            </span>
+          </div>
+        )
+      })}
       <div className="state-row">
         <span className="dim">emotion</span>
-        <span
-          style={{
-            color: `hsl(${state.emotion.hue}, ${state.emotion.saturation * 100}%, 65%)`,
-          }}
-        >
-          {state.emotion.hue.toFixed(0)}° / {(state.emotion.saturation * 100).toFixed(0)}% / {(state.emotion.lightness * 100).toFixed(0)}%
+        <span style={{ color: emotionCss(state.emotion) }}>
+          {state.emotion.hue.toFixed(0)}° · {(state.emotion.saturation * 100).toFixed(0)}% · energy{' '}
+          {(state.emotion.lightness * 100).toFixed(0)}%
         </span>
       </div>
       {topInterests.length > 0 && (
@@ -97,7 +93,7 @@ function StatePanel({ state }: { state: SessionState }) {
               <span
                 key={domain}
                 className="interest-tag"
-                style={{ borderColor: DOMAIN_COLORS[domain] ?? '#666', color: DOMAIN_COLORS[domain] ?? '#aaa' }}
+                style={{ borderColor: domainColor(domain), color: domainColor(domain) }}
               >
                 {domain} {depth.toFixed(2)}
               </span>
@@ -109,24 +105,18 @@ function StatePanel({ state }: { state: SessionState }) {
   )
 }
 
-interface Message {
-  id: string
-  text: string
-  deltas: SignalDeltas
-}
-
 interface Props {
-  state: SessionState | null
-  connected: boolean
-  messages: Message[]
+  state: CometState | null
+  entries: Entry[]
   promptSuggestion: string | null
   isLoading: boolean
   error: string | null
   onSend: (text: string) => void
+  onReset: () => void
   onClose: () => void
 }
 
-export function ChatPanel({ state, connected, messages, promptSuggestion, isLoading, error, onSend, onClose }: Props) {
+export function ChatPanel({ state, entries, promptSuggestion, isLoading, error, onSend, onReset, onClose }: Props) {
   const [input, setInput] = useState('')
   const historyRef = useRef<HTMLDivElement>(null)
 
@@ -134,7 +124,7 @@ export function ChatPanel({ state, connected, messages, promptSuggestion, isLoad
     if (historyRef.current) {
       historyRef.current.scrollTop = historyRef.current.scrollHeight
     }
-  }, [messages])
+  }, [entries])
 
   const handleSubmit = (text: string) => {
     const trimmed = text.trim()
@@ -156,6 +146,14 @@ export function ChatPanel({ state, connected, messages, promptSuggestion, isLoad
         <span className="chat-title">Personality Vectorscope</span>
         <div className="chat-header-right">
           {state && <span className="message-count">{state.message_count} signals</span>}
+          {entries.length > 0 && (
+            <button
+              className="chat-reset-btn"
+              onClick={() => window.confirm('Start a new comet? This clears your history on this device.') && onReset()}
+            >
+              new comet
+            </button>
+          )}
           <button className="chat-close-btn" onClick={onClose} aria-label="Close panel">✕</button>
         </div>
       </div>
@@ -163,18 +161,14 @@ export function ChatPanel({ state, connected, messages, promptSuggestion, isLoad
       {state && <StatePanel state={state} />}
 
       <div className="chat-history" ref={historyRef}>
-        {messages.length === 0 && (
-          <div className="chat-empty">
-            {promptSuggestion
-              ? 'Start by answering the prompt below, or write freely.'
-              : 'Connecting…'}
-          </div>
+        {entries.length === 0 && (
+          <div className="chat-empty">Start by answering the prompt below, or write freely.</div>
         )}
 
-        {messages.map((msg) => (
-          <div key={msg.id} className="chat-message">
-            <div className="message-text">{msg.text}</div>
-            <SignalReadout deltas={msg.deltas} />
+        {entries.map((entry) => (
+          <div key={entry.id} className="chat-message">
+            <div className="message-text">{entry.text}</div>
+            <SignalReadout observation={entry.observation} />
           </div>
         ))}
 
@@ -187,7 +181,7 @@ export function ChatPanel({ state, connected, messages, promptSuggestion, isLoad
 
       {error && <div className="chat-error">{error}</div>}
 
-      {promptSuggestion && messages.length === 0 && (
+      {promptSuggestion && entries.length === 0 && (
         <button
           className="prompt-suggestion"
           onClick={() => setInput(promptSuggestion)}
@@ -197,7 +191,7 @@ export function ChatPanel({ state, connected, messages, promptSuggestion, isLoad
         </button>
       )}
 
-      {promptSuggestion && messages.length > 0 && (
+      {promptSuggestion && entries.length > 0 && (
         <div className="next-prompt">
           <span className="dim">next →</span>
           <button
@@ -219,13 +213,13 @@ export function ChatPanel({ state, connected, messages, promptSuggestion, isLoad
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="Write freely, or answer the prompt above…"
-          disabled={isLoading || !connected}
+          disabled={isLoading}
           rows={3}
         />
         <button
           className="send-btn"
           onClick={() => handleSubmit(input)}
-          disabled={isLoading || !input.trim() || !connected}
+          disabled={isLoading || !input.trim()}
         >
           {isLoading ? '…' : '→'}
         </button>

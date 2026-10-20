@@ -109,12 +109,55 @@ The prompt flow is ordered to build trust and extract progressively richer signa
 
 | Layer | Technology |
 |---|---|
-| 3D rendering | [Three.js](https://threejs.org/) with custom `ShaderMaterial` |
-| Mesh deformation | Vertex displacement along normals (UV sphere, ~64×64 subdivisions) |
-| Color encoding | Per-vertex color data driven by emotion signal deltas |
-| UI shell | React |
-| NLP extraction | Anthropic Claude API (structured JSON output) |
-| State management | Accumulated signal history stored per session; delta updates on each input |
+| 3D rendering | [Three.js](https://threejs.org/) via React Three Fiber + drei |
+| Post-processing | `@react-three/postprocessing` (bloom, vignette, grain) |
+| Comet tail | `meshline` ribbon through every observation, coloured per message |
+| Motion & colour | `maath` damping; `culori` OKLCH so emotion hues share one perceived brightness |
+| UI shell | React 19, Vite |
+| Client state | `zustand` persisted to `localStorage`, validated with `zod` |
+| NLP extraction | Anthropic Claude API, structured output parsed into Pydantic models |
+| API | FastAPI, stateless: the client sends its comet with each message |
+| Shared vocabulary | `backend/app/spec.json` defines axes, domains and prompts for both sides |
+
+### How the comet encodes a person
+
+| Comet part | Signal |
+|---|---|
+| Nucleus position | Personality (x/y/z) |
+| Coma colour | Emotion hue and intensity |
+| Glow size and brightness | Energy |
+| Haze around the coma | Uncertainty: wide at first, tightening as evidence builds |
+| Jets | Depth per interest domain, along that domain's direction |
+| Tail | The path through every observation so far, in the colour of each moment |
+
+Personality is estimated with a per-axis Kalman filter, so repeated readings converge on
+where the person sits instead of drifting to the edge of the space.
+
+---
+
+## Running Locally
+
+```bash
+# Backend (Python 3.12+)
+cd backend
+python -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
+cp .env.example .env            # add ANTHROPIC_API_KEY
+.venv/bin/uvicorn app.main:app --reload --port 8000
+
+# Frontend
+cd frontend
+npm install
+npm run dev                     # http://localhost:5173, proxies /api to :8000
+```
+
+Open `http://localhost:5173/?debug` for slider controls over every visual channel.
+
+### Checks
+
+```bash
+cd backend  && .venv/bin/pytest && .venv/bin/ruff check . && .venv/bin/ruff format --check .
+cd frontend && npm run lint && npm test && npm run build
+```
 
 ---
 

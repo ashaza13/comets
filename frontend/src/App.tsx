@@ -1,101 +1,78 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { lazy, Suspense, useState, useCallback, useMemo } from 'react'
 import { Scene } from './components/Scene'
 import { ChatPanel } from './components/ChatPanel'
 import { IntroFlow, INTRO_COMPLETE_AT } from './components/IntroFlow'
-import { createSession, sendMessage } from './lib/api'
-import type { SessionState, SignalDeltas } from './lib/types'
-
-interface Message {
-  id: string
-  text: string
-  deltas: SignalDeltas
-}
+import { useCometStore } from './store'
 
 type AppPhase = 'intro' | 'main'
 
+const DEBUG = new URLSearchParams(window.location.search).has('debug')
+const DebugPanel = lazy(() => import('./components/DebugPanel'))
+
 export default function App() {
-  const [sessionId, setSessionId]               = useState<string | null>(null)
-  const [state, setState]                       = useState<SessionState | null>(null)
-  const [messages, setMessages]                 = useState<Message[]>([])
-  const [promptSuggestion, setPromptSuggestion] = useState<string | null>(null)
-  const [isLoading, setIsLoading]               = useState(false)
-  const [error, setError]                       = useState<string | null>(null)
-  const [phase, setPhase]                       = useState<AppPhase>('intro')
-  const [introExiting, setIntroExiting]         = useState(false)
-  const [chatOpen, setChatOpen]                 = useState(false)
-  const idCounter                               = useRef(0)
+  const entries      = useCometStore((s) => s.entries)
+  const nextPrompt   = useCometStore((s) => s.nextPrompt)
+  const isLoading    = useCometStore((s) => s.isLoading)
+  const error        = useCometStore((s) => s.error)
+  const debugComet   = useCometStore((s) => s.debugComet)
+  const send         = useCometStore((s) => s.send)
+  const reset        = useCometStore((s) => s.reset)
 
-  useEffect(() => {
-    createSession()
-      .then((id) => {
-        setSessionId(id)
-        setPromptSuggestion(
-          "What's been on your mind lately? Could be anything — work, something you saw, a feeling you can't shake.",
-        )
-      })
-      .catch(() => setError('Could not connect to backend. Is it running on port 8000?'))
-  }, [])
+  // Returning visitors with a saved comet skip straight to the sky.
+  const [phase, setPhase]               = useState<AppPhase>(() => (entries.length > 0 || DEBUG ? 'main' : 'intro'))
+  const [introExiting, setIntroExiting] = useState(false)
+  const [chatOpen, setChatOpen]         = useState(false)
 
-  // Transition out of intro after enough questions answered
-  useEffect(() => {
-    if (phase === 'intro' && messages.length >= INTRO_COMPLETE_AT) {
-      setIntroExiting(true)
-      setTimeout(() => setPhase('main'), 650)
-    }
-  }, [messages.length, phase])
+  const history = useMemo(() => entries.map((e) => e.state), [entries])
+  const state = debugComet ?? history.at(-1) ?? null
+  const demo = state === null
 
-  const skipIntro = useCallback(() => {
+  const leaveIntro = useCallback(() => {
     setIntroExiting(true)
     setTimeout(() => setPhase('main'), 650)
   }, [])
 
+  // Transition out of intro after enough questions answered
   const handleSend = useCallback(
     async (text: string) => {
-      if (!sessionId) return
-      setIsLoading(true)
-      setError(null)
-      try {
-        const response = await sendMessage(sessionId, text)
-        idCounter.current += 1
-        setMessages((prev) => [
-          ...prev,
-          { id: String(idCounter.current), text, deltas: response.deltas },
-        ])
-        setState(response.state)
-        setPromptSuggestion(response.prompt_suggestion)
-      } catch (e) {
-        setError(e instanceof Error ? e.message : 'Unknown error')
-      } finally {
-        setIsLoading(false)
-      }
+      await send(text)
+      if (phase === 'intro' && useCometStore.getState().entries.length >= INTRO_COMPLETE_AT) leaveIntro()
     },
-    [sessionId],
+    [send, phase, leaveIntro],
   )
+
+  const handleReset = useCallback(() => {
+    reset()
+    setChatOpen(false)
+    setIntroExiting(false)
+    setPhase('intro')
+  }, [reset])
 
   return (
     <div className="layout">
+      {DEBUG && (
+        <Suspense fallback={null}>
+          <DebugPanel />
+        </Suspense>
+      )}
 
       {/* Chat panel — hidden until user opens it */}
       <div className={`chat-panel-wrapper ${chatOpen ? 'chat-panel-wrapper--open' : ''}`}>
         <ChatPanel
           state={state}
-          connected={sessionId !== null}
-          messages={messages}
-          promptSuggestion={promptSuggestion}
+          entries={entries}
+          promptSuggestion={nextPrompt}
           isLoading={isLoading}
           error={error}
           onSend={handleSend}
+          onReset={handleReset}
           onClose={() => setChatOpen(false)}
         />
       </div>
 
       {/* 3D scene — always rendered */}
       <div className="scene-container">
-        <Scene
-          state={state}
-          isLoading={isLoading}
-          demoMode={messages.length === 0}
-        />
+        <Scene state={state} history={debugComet ? [] : history} isLoading={isLoading} demo={demo} />
       </div>
 
       {/* Floating toggle button — visible in main phase when panel is closed */}
@@ -109,16 +86,14 @@ export default function App() {
       {phase === 'intro' && (
         <IntroFlow
           exiting={introExiting}
-          connected={sessionId !== null}
-          promptSuggestion={promptSuggestion}
+          promptSuggestion={nextPrompt}
           isLoading={isLoading}
           error={error}
           onSend={handleSend}
-          messageCount={messages.length}
-          onSkip={skipIntro}
+          messageCount={entries.length}
+          onSkip={leaveIntro}
         />
       )}
-
     </div>
   )
 }

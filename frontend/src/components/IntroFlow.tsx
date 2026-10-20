@@ -1,6 +1,16 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { AXES } from '../lib/spec'
 
-const SLIDES = [
+interface Slide {
+  eyebrow: string | null
+  title: string | null
+  body: string | null
+  axes: { color: string; label: string; desc: string }[] | null
+  cta: string | null
+  autoAdvance: number | null
+}
+
+const SLIDES: Slide[] = [
   {
     eyebrow: null,
     title: 'Personality\nVectorscope',
@@ -12,7 +22,7 @@ const SLIDES = [
   {
     eyebrow: 'how it works',
     title: 'Your words carry signals.',
-    body: 'Emotional tone. Curiosity. Ways of thinking. Every message you send moves a point through three-dimensional space — the comet behind you.',
+    body: 'Emotional tone. Curiosity. Ways of thinking. Every message you send moves your comet through three-dimensional space, and its tail remembers the path.',
     axes: null,
     cta: null,
     autoAdvance: 4800,
@@ -21,13 +31,17 @@ const SLIDES = [
     eyebrow: 'three axes',
     title: null,
     body: null,
-    axes: [
-      { color: '#ff6b6b', label: 'extrovert ↔ introvert', desc: 'how you relate to the world' },
-      { color: '#6bff9e', label: 'abstract ↔ concrete',   desc: 'how you think and explain' },
-      { color: '#6bb5ff', label: 'analytical ↔ intuitive', desc: 'how you make decisions'   },
-    ],
+    axes: AXES.map((a) => ({ color: a.color, label: `${a.negative} ↔ ${a.positive}`, desc: a.description })),
     cta: null,
     autoAdvance: 4800,
+  },
+  {
+    eyebrow: 'reading the comet',
+    title: null,
+    body: 'Its colour is your mood. Its glow is your energy. Jets mark the subjects you know deeply. The haze tightens as the scope gets surer of you.',
+    axes: null,
+    cta: null,
+    autoAdvance: 5600,
   },
   {
     eyebrow: 'ready',
@@ -37,14 +51,13 @@ const SLIDES = [
     cta: 'Begin',
     autoAdvance: null,
   },
-] as const
+]
 
 // After this many answered questions, App transitions to main layout
 export const INTRO_COMPLETE_AT = 3
 
 interface Props {
   exiting: boolean
-  connected: boolean
   promptSuggestion: string | null
   isLoading: boolean
   error: string | null
@@ -57,7 +70,6 @@ type InternalPhase = 'slides' | 'questions'
 
 export function IntroFlow({
   exiting,
-  connected,
   promptSuggestion,
   isLoading,
   error,
@@ -73,13 +85,6 @@ export function IntroFlow({
 
   const slide = SLIDES[slideIdx]
 
-  // ── Slide auto-advance ────────────────────────────────────────────────────
-  useEffect(() => {
-    if (internalPhase !== 'slides' || !slide.autoAdvance) return
-    const id = setTimeout(() => advanceSlide(), slide.autoAdvance)
-    return () => clearTimeout(id)
-  }, [slideIdx, internalPhase]) // eslint-disable-line react-hooks/exhaustive-deps
-
   const fadeTransition = useCallback((cb: () => void) => {
     setContentVisible(false)
     setTimeout(() => { cb(); setContentVisible(true) }, 380)
@@ -93,6 +98,13 @@ export function IntroFlow({
     }
   }, [slideIdx, fadeTransition])
 
+  // ── Slide auto-advance ────────────────────────────────────────────────────
+  useEffect(() => {
+    if (internalPhase !== 'slides' || !slide.autoAdvance) return
+    const id = setTimeout(() => advanceSlide(), slide.autoAdvance)
+    return () => clearTimeout(id)
+  }, [slide.autoAdvance, internalPhase, advanceSlide])
+
   // Focus textarea when entering questions phase
   useEffect(() => {
     if (internalPhase === 'questions') {
@@ -102,10 +114,10 @@ export function IntroFlow({
 
   const handleSubmit = useCallback(() => {
     const trimmed = input.trim()
-    if (!trimmed || isLoading || !connected) return
+    if (!trimmed || isLoading) return
     setInput('')
     onSend(trimmed)
-  }, [input, isLoading, connected, onSend])
+  }, [input, isLoading, onSend])
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSubmit() }
@@ -199,13 +211,13 @@ export function IntroFlow({
                 onChange={e => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder={isLoading ? 'reading your signal…' : 'Write freely…'}
-                disabled={isLoading || !connected}
+                disabled={isLoading}
                 rows={4}
               />
               <button
                 className="intro-q-submit"
                 onClick={handleSubmit}
-                disabled={isLoading || !input.trim() || !connected}
+                disabled={isLoading || !input.trim()}
               >
                 {isLoading ? '…' : '→'}
               </button>
