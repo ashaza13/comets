@@ -1,72 +1,94 @@
-from pydantic import BaseModel, Field
-from typing import Optional
+from enum import StrEnum
+from typing import Annotated
+
+from pydantic import BaseModel, BeforeValidator, Field
+
+from app.spec import DOMAIN_IDS
+
+# Built from spec.json so the structured-output schema only offers known domains.
+Domain = StrEnum("Domain", {d: d for d in DOMAIN_IDS})
 
 
-class PersonalityDelta(BaseModel):
-    x: float = Field(0.0, ge=-1.0, le=1.0)  # social: introvert <-> extrovert
-    y: float = Field(0.0, ge=-1.0, le=1.0)  # cognitive: concrete <-> abstract
-    z: float = Field(0.0, ge=-1.0, le=1.0)  # engagement: analytical <-> creative
+def _clamper(lo: float, hi: float):
+    def clamp(v):
+        if v is None:
+            return None
+        return max(lo, min(hi, float(v)))
+
+    return BeforeValidator(clamp)
 
 
-class EmotionTarget(BaseModel):
-    # Targets in HSL space; null means "no signal, don't update"
-    hue: Optional[float] = Field(None, ge=0.0, le=360.0)
-    saturation: Optional[float] = Field(None, ge=0.0, le=1.0)
-    lightness: Optional[float] = Field(None, ge=0.0, le=1.0)
+# Ranges are enforced by clamping rather than rejecting, so a slightly
+# out-of-range model value nudges the comet instead of discarding the reading.
+Signed = Annotated[float, _clamper(-1.0, 1.0)]
+Unit = Annotated[float, _clamper(0.0, 1.0)]
+Hue = Annotated[float, BeforeValidator(lambda v: None if v is None else float(v) % 360.0)]
 
 
-class InterestDelta(BaseModel):
-    domain: str
-    depth_delta: float = Field(..., ge=-1.0, le=1.0)
+# ── Extractor output (one reading of one message) ──────────────────────────────
 
 
-class SignalDeltas(BaseModel):
-    personality: PersonalityDelta
-    emotion: EmotionTarget
-    interests: list[InterestDelta]
-    confidence: float = Field(..., ge=0.0, le=1.0)
-    reasoning: str
+class PersonalityReading(BaseModel):
+    """Where this text places the writer on each axis, or null when there is no signal."""
+
+    x: Signed | None = Field(None, description="-1 introverted … +1 extroverted, null if no signal")
+    y: Signed | None = Field(None, description="-1 concrete … +1 abstract, null if no signal")
+    z: Signed | None = Field(None, description="-1 analytical … +1 creative, null if no signal")
 
 
-# ── Accumulated state ──────────────────────────────────────────────────────────
+class EmotionReading(BaseModel):
+    hue: Hue | None = Field(None, description="0 angry · 60 joyful · 120 calm · 200 reflective · 270 anxious")
+    saturation: Unit | None = Field(None, description="0 flat/numb … 1 vivid emotion")
+    lightness: Unit | None = Field(None, description="0 depleted … 1 highly energised")
 
-class PersonalityPosition(BaseModel):
+
+class InterestReading(BaseModel):
+    domain: Domain
+    depth: Unit = Field(description="0 passing mention … 1 expert-level depth shown in this text")
+
+
+class Observation(BaseModel):
+    personality: PersonalityReading
+    emotion: EmotionReading
+    interests: list[InterestReading]
+    confidence: Unit = Field(description="0 almost no signal … 1 rich, clear signal")
+    reasoning: str = Field(description="One short sentence on the primary reading")
+
+
+# ── Accumulated comet state (owned by the client, sent back on each request) ───
+
+
+class Vec3(BaseModel):
     x: float = 0.0
     y: float = 0.0
     z: float = 0.0
 
 
 class EmotionState(BaseModel):
-    hue: float = 200.0       # default: reflective blue
+    hue: float = 200.0  # reflective blue
     saturation: float = 0.3
     lightness: float = 0.5
 
 
-class HistoryEntry(BaseModel):
-    input_text: str
-    deltas: SignalDeltas
-
-
-class SessionState(BaseModel):
-    session_id: str
-    personality: PersonalityPosition = PersonalityPosition()
-    emotion: EmotionState = EmotionState()
-    interests: dict[str, float] = {}   # domain -> depth score, clamped 0–3
-    history: list[HistoryEntry] = []
+class CometState(BaseModel):
+    personality: Vec3 = Field(default_factory=Vec3)
+    # Variance of the personality estimate per axis: 1 = knows nothing, → 0 = certain.
+    uncertainty: Vec3 = Field(default_factory=lambda: Vec3(x=1.0, y=1.0, z=1.0))
+    emotion: EmotionState = Field(default_factory=EmotionState)
+    interests: dict[str, float] = Field(default_factory=dict)  # domain -> depth 0–1
     message_count: int = 0
 
 
 # ── API shapes ─────────────────────────────────────────────────────────────────
 
-class CreateSessionResponse(BaseModel):
-    session_id: str
+
+class ObserveRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=8000)
+    prompt: str | None = Field(None, max_length=500)
+    state: CometState | None = None
 
 
-class MessageRequest(BaseModel):
-    text: str
-
-
-class MessageResponse(BaseModel):
-    deltas: SignalDeltas
-    state: SessionState
-    prompt_suggestion: Optional[str] = None  # next conversational prompt to show user
+class ObserveResponse(BaseModel):
+    observation: Observation
+    state: CometState
+    next_prompt: str | None = None

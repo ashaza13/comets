@@ -1,0 +1,79 @@
+{
+  "axes": [
+    {
+      "key": "x",
+      "name": "social orientation",
+      "negative": "introvert",
+      "positive": "extrovert",
+      "description": "how you relate to the world",
+      "color": "#ff6b6b"
+    },
+    {
+      "key": "y",
+      "name": "cognitive style",
+      "negative": "concrete",
+      "positive": "abstract",
+      "description": "how you think and explain",
+      "color": "#6bff9e"
+    },
+    {
+      "key": "z",
+      "name": "engagement mode",
+      "negative": "analytical",
+      "positive": "creative",
+      "description": "how you make and decide",
+      "color": "#6bb5ff"
+    }
+  ],
+  "domains": [
+    { "id": "literature",   "direction": [1, 0, 0],                "color": "#ff6b6b" },
+    { "id": "athletics",    "direction": [-1, 0, 0],               "color": "#ff9f43" },
+    { "id": "philosophy",   "direction": [0, 1, 0],                "color": "#ffd93d" },
+    { "id": "cooking",      "direction": [0, -1, 0],               "color": "#6bcb77" },
+    { "id": "film",         "direction": [0, 0, 1],                "color": "#4d96ff" },
+    { "id": "gaming",       "direction": [0, 0, -1],               "color": "#c77dff" },
+    { "id": "science",      "direction": [0.5774, 0.5774, 0.5774],    "color": "#00d2ff" },
+    { "id": "technology",   "direction": [0.5774, 0.5774, -0.5774],   "color": "#0096c7" },
+    { "id": "art",          "direction": [-0.5774, 0.5774, 0.5774],   "color": "#f77f00" },
+    { "id": "music",        "direction": [-0.5774, 0.5774, -0.5774],  "color": "#e040fb" },
+    { "id": "mathematics",  "direction": [0.5774, -0.5774, 0.5774],   "color": "#00b4d8" },
+    { "id": "psychology",   "direction": [0.5774, -0.5774, -0.5774],  "color": "#ff4d6d" },
+    { "id": "history",      "direction": [-0.5774, -0.5774, 0.5774],  "color": "#b5838d" },
+    { "id": "spirituality", "direction": [-0.5774, -0.5774, -0.5774], "color": "#9b5de5" },
+    { "id": "nature",       "direction": [0.7071, 0.7071, 0],      "color": "#80b918" },
+    { "id": "economics",    "direction": [-0.7071, 0.7071, 0],     "color": "#f4a261" },
+    { "id": "politics",     "direction": [0, 0.7071, 0.7071],      "color": "#e63946" },
+    { "id": "software",     "direction": [0, 0.7071, -0.7071],     "color": "#48cae4" },
+    { "id": "social",       "direction": [0.7071, 0, 0.7071],      "color": "#ff9ece" },
+    { "id": "health",       "direction": [0.7071, 0, -0.7071],     "color": "#52b788" }
+  ],
+  "stages": [
+    {
+      "id": "calibrate",
+      "prompts": [
+        "What's been on your mind lately? Could be anything — work, something you saw, a feeling you can't shake.",
+        "How has your energy been recently? What's been pulling at your attention?"
+      ]
+    },
+    {
+      "id": "surface",
+      "prompts": [
+        "Tell me about something you know deeply — explain it to a curious friend who's never heard of it.",
+        "What's something you've been genuinely excited about recently, even if it seems small?"
+      ]
+    },
+    {
+      "id": "anchor",
+      "prompts": [
+        "Who do you deeply admire, and what exactly is it about them that gets to you?",
+        "What would you do with a completely unexpected free week — no obligations, no guilt?"
+      ]
+    },
+    {
+      "id": "direct",
+      "prompts": [
+        "Where do you feel you're headed right now? What's pulling you forward?"
+      ]
+    }
+  ]
+}

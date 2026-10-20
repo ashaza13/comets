@@ -1,75 +1,53 @@
-from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException
+from typing import Annotated
+
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from dotenv import load_dotenv
 
-from app.llm.provider import LLMConfig, load_config
-from app.signals.extractor import extract_signals
-from app.signals.models import CreateSessionResponse, MessageRequest, MessageResponse
-from app.session.state import (
-    create_session,
-    get_session,
-    get_prompt_suggestion,
-    update_session,
-)
+from app.comet import apply_observation
+from app.config import get_settings
+from app.signals.extractor import ClaudeExtractor, ExtractionError, Extractor
+from app.signals.models import CometState, ObserveRequest, ObserveResponse
+from app.spec import next_prompt
 
-load_dotenv()
+settings = get_settings()
 
-_llm_config: LLMConfig | None = None
-
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    global _llm_config
-    _llm_config = load_config()
-    print(f"LLM provider: {_llm_config.model}")
-    yield
-
-
-app = FastAPI(title="Personality Vectorscope API", lifespan=lifespan)
+app = FastAPI(title="Personality Vectorscope API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # tighten this when the frontend URL is known
+    allow_origins=settings.cors_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+_extractor: Extractor | None = None
 
-# ── Health ─────────────────────────────────────────────────────────────────────
+
+def get_extractor() -> Extractor:
+    # Created lazily so importing the app (e.g. in tests) needs no API key.
+    global _extractor
+    if _extractor is None:
+        _extractor = ClaudeExtractor(settings)
+    return _extractor
+
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "model": _llm_config.model if _llm_config else None}
+    return {"status": "ok", "model": settings.llm_model}
 
 
-# ── Sessions ───────────────────────────────────────────────────────────────────
-
-@app.post("/session", response_model=CreateSessionResponse, status_code=201)
-def new_session():
-    state = create_session()
-    return CreateSessionResponse(session_id=state.session_id)
-
-
-@app.get("/session/{session_id}")
-def get_session_state(session_id: str):
-    state = get_session(session_id)
-    if state is None:
-        raise HTTPException(status_code=404, detail="Session not found")
-    return state
-
-
-# ── Message processing ─────────────────────────────────────────────────────────
-
-@app.post("/session/{session_id}/message", response_model=MessageResponse)
-def process_message(session_id: str, body: MessageRequest):
-    if get_session(session_id) is None:
-        raise HTTPException(status_code=404, detail="Session not found")
-    if not body.text.strip():
+# The backend is stateless: the client owns the comet and sends it with each
+# message, so nothing personal is stored server-side and any instance can serve.
+@app.post("/observe", response_model=ObserveResponse)
+def observe(body: ObserveRequest, extract: Annotated[Extractor, Depends(get_extractor)]):
+    text = body.text.strip()
+    if not text:
         raise HTTPException(status_code=422, detail="Text must not be empty")
 
-    deltas = extract_signals(body.text, _llm_config)
-    state = update_session(session_id, body.text, deltas)
-    suggestion = get_prompt_suggestion(session_id)
+    try:
+        observation = extract(text, body.prompt)
+    except ExtractionError as e:
+        raise HTTPException(status_code=502, detail=str(e)) from e
 
-    return MessageResponse(deltas=deltas, state=state, prompt_suggestion=suggestion)
+    state = apply_observation(body.state or CometState(), observation)
+    return ObserveResponse(observation=observation, state=state, next_prompt=next_prompt(state.message_count))
