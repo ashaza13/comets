@@ -17,6 +17,8 @@ export default function App() {
   const debugComet   = useCometStore((s) => s.debugComet)
   const send         = useCometStore((s) => s.send)
   const reset        = useCometStore((s) => s.reset)
+  const chartMode    = useCometStore((s) => s.chartMode)
+  const toggleChart  = useCometStore((s) => s.toggleChartMode)
 
   // Returning visitors with a saved comet skip straight to the sky.
   const [phase, setPhase]               = useState<AppPhase>(() => (entries.length > 0 || DEBUG ? 'main' : 'intro'))
@@ -72,13 +74,19 @@ export default function App() {
 
       {/* 3D scene — always rendered */}
       <div className="scene-container">
-        <Scene state={state} history={debugComet ? [] : history} isLoading={isLoading} demo={demo} />
+        <Scene state={state} history={debugComet ? [] : history} isLoading={isLoading} demo={demo} chartMode={chartMode} />
       </div>
 
       {/* Floating toggle button — visible in main phase when panel is closed */}
       {phase === 'main' && !chatOpen && (
         <button className="chat-open-btn" onClick={() => setChatOpen(true)}>
           ≡ signals
+        </button>
+      )}
+
+      {phase === 'main' && (
+        <button className="chart-toggle-btn" onClick={toggleChart} aria-pressed={chartMode}>
+          {chartMode ? '✦ sky' : '◎ chart'}
         </button>
       )}
 

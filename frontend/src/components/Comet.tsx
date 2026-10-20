@@ -4,6 +4,7 @@ import { useFrame } from '@react-three/fiber'
 import { easing } from 'maath'
 import * as THREE from 'three'
 import { emotionColor, emotionCss, energyGlow } from '../lib/color'
+import { createGlowTexture } from '../lib/textures'
 import type { CometState } from '../lib/schema'
 import { AXES, DOMAINS, domainColor } from '../lib/spec'
 import { meanUncertainty, toWorld } from '../lib/tail'
@@ -12,22 +13,8 @@ const UP = new THREE.Vector3(0, 1, 0)
 const JET_MIN = 0.06
 const JET_MAX = 1.5
 
-// Soft radial falloff used for the coma and halo sprites.
 function useGlowTexture() {
-  return useMemo(() => {
-    const size = 128
-    const canvas = document.createElement('canvas')
-    canvas.width = canvas.height = size
-    const ctx = canvas.getContext('2d')!
-    const g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2)
-    g.addColorStop(0, 'rgba(255,255,255,1)')
-    g.addColorStop(0.25, 'rgba(255,255,255,0.55)')
-    g.addColorStop(0.6, 'rgba(255,255,255,0.12)')
-    g.addColorStop(1, 'rgba(255,255,255,0)')
-    ctx.fillStyle = g
-    ctx.fillRect(0, 0, size, size)
-    return new THREE.CanvasTexture(canvas)
-  }, [])
+  return useMemo(() => createGlowTexture(), [])
 }
 
 // A cone with its base at the nucleus and its tip one unit out along +y.

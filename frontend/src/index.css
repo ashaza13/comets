@@ -338,7 +338,8 @@ body {
 
 /* ── Floating signals toggle button ─────────────────────────────────────── */
 
-.chat-open-btn {
+.chat-open-btn,
+.chart-toggle-btn {
   position: fixed;
   bottom: 24px;
   left: 24px;
@@ -356,7 +357,8 @@ body {
   transition: border-color 0.15s, color 0.15s;
 }
 
-.chat-open-btn:hover {
+.chat-open-btn:hover,
+.chart-toggle-btn:hover {
   border-color: var(--accent);
   color: #d0d0f8;
 }
@@ -683,3 +685,8 @@ body {
 }
 
 .chat-reset-btn:hover { color: var(--text); border-color: var(--text-dim); }
+
+.chart-toggle-btn {
+  left: auto;
+  right: 24px;
+}

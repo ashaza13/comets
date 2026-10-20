@@ -110,7 +110,8 @@ The prompt flow is ordered to build trust and extract progressively richer signa
 | Layer | Technology |
 |---|---|
 | 3D rendering | [Three.js](https://threejs.org/) via React Three Fiber + drei |
-| Post-processing | `@react-three/postprocessing` (bloom, vignette, grain) |
+| Sky | Procedural nebula (simplex-noise fbm baked once into a cube map), twinkling starfield with a galactic band, drifting dust; custom GLSL via `vite-plugin-glsl` |
+| Post-processing | `@react-three/postprocessing` (bloom, vignette, grain, AgX tone mapping) |
 | Comet tail | `meshline` ribbon through every observation, coloured per message |
 | Motion & colour | `maath` damping; `culori` OKLCH so emotion hues share one perceived brightness |
 | UI shell | React 19, Vite |
@@ -150,7 +151,8 @@ npm install
 npm run dev                     # http://localhost:5173, proxies /api to :8000
 ```
 
-Open `http://localhost:5173/?debug` for slider controls over every visual channel.
+Open `http://localhost:5173/?debug` for slider controls over every visual channel. The **◎ chart** button
+switches from the constellation view to crisp axes and rings for reading exact positions.
 
 ### Checks
 

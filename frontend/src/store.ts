@@ -12,6 +12,9 @@ interface CometStore {
   error: string | null
   // Manual state from the ?debug panel; overrides the observed comet when set.
   debugComet: CometState | null
+  // Chart mode shows crisp axes and rings for reading exact values.
+  chartMode: boolean
+  toggleChartMode: () => void
   send: (text: string) => Promise<void>
   reset: () => void
   setDebugComet: (state: CometState | null) => void
@@ -20,6 +23,7 @@ interface CometStore {
 const PersistedSchema = z.object({
   entries: z.array(EntrySchema),
   nextPrompt: z.string().nullable(),
+  chartMode: z.boolean().default(false),
 })
 
 export const useCometStore = create<CometStore>()(
@@ -30,6 +34,8 @@ export const useCometStore = create<CometStore>()(
       isLoading: false,
       error: null,
       debugComet: null,
+      chartMode: false,
+      toggleChartMode: () => set((s) => ({ chartMode: !s.chartMode })),
 
       send: async (text) => {
         const { entries, nextPrompt, isLoading } = get()
@@ -59,7 +65,7 @@ export const useCometStore = create<CometStore>()(
       name: 'comets:v1',
       version: 1,
       storage: createJSONStorage(() => localStorage),
-      partialize: (s) => ({ entries: s.entries, nextPrompt: s.nextPrompt }),
+      partialize: (s) => ({ entries: s.entries, nextPrompt: s.nextPrompt, chartMode: s.chartMode }),
       // Discard stored data that no longer matches the schema instead of crashing.
       merge: (persisted, current) => {
         const parsed = PersistedSchema.safeParse(persisted)
