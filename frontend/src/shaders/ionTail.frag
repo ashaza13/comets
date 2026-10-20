@@ -9,7 +9,7 @@ varying vec2 vUv; // x: across the tail, y: 0 at the nucleus → 1 at the tip
 
 void main() {
   float x = (vUv.x - 0.5) * 2.0;
-  float y = vUv.y;
+  float y = clamp(vUv.y, 0.0, 1.0);
   float width = mix(0.12, 1.0, pow(y, 0.55));
   float across = exp(-(x * x) / (width * width) * 5.0);
   float streaks = 0.5 + 0.5 * snoise(vec3(x * 7.0 / width, y * 2.5 - uTime * 0.9, 1.7));

@@ -40,5 +40,5 @@ void main() {
   vec4 c = texture(uColors, vec2(u, 0.5));
   vColor = c.rgb * uTint;
   vAlpha = c.a * (1.0 - 0.7 * age) * step(1.5, uCount);
-  gl_PointSize = (0.8 + 2.2 * aSeed.z) * (1.0 - 0.4 * age) * uPixelRatio * (6.0 / max(-mv.z, 0.5));
+  gl_PointSize = min((0.8 + 2.2 * aSeed.z) * (1.0 - 0.4 * age) * uPixelRatio * (6.0 / max(-mv.z, 0.5)), 32.0);
 }

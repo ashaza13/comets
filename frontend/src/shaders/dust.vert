@@ -16,7 +16,7 @@ void main() {
   vec4 mv = modelViewMatrix * vec4(p, 1.0);
   gl_Position = projectionMatrix * mv;
   float depth = max(-mv.z, 0.5);
-  gl_PointSize = aSize * uPixelRatio * (12.0 / depth);
+  gl_PointSize = min(aSize * uPixelRatio * (12.0 / depth), 32.0);
   // Fade motes that come very close to the camera.
   vAlpha = smoothstep(0.6, 2.0, depth);
 }

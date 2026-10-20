@@ -12,6 +12,7 @@ import { Nebula } from './Nebula'
 import { Starfield } from './Starfield'
 import { Tail } from './Tail'
 import { emotionColor } from '../lib/color'
+import { createNanGuardPass } from '../lib/nanGuard'
 import type { CometState } from '../lib/schema'
 import { useReducedMotion } from '../hooks/useReducedMotion'
 
@@ -83,6 +84,7 @@ export function Scene({ state, history, isLoading, demo, chartMode }: Props) {
   const head = useMemo(() => ({ get current() { return comet.current?.group ?? null } }), [])
   const look = useMemo(() => ({ get current() { return comet.current?.look ?? null } }), [])
   const tint = useMemo(() => moodTint(history, state), [history, state])
+  const nanGuard = useMemo(() => createNanGuardPass(), [])
 
   return (
     <Canvas camera={{ position: [4.6, 2.4, 6.4], fov: 50 }} gl={{ antialias: true }} style={{ background: '#04040a' }}>
@@ -97,6 +99,8 @@ export function Scene({ state, history, isLoading, demo, chartMode }: Props) {
       <IdleOrbit demo={demo} />
 
       <EffectComposer multisampling={4}>
+        {/* Must run before bloom, which would otherwise smear one bad pixel over the frame. */}
+        <primitive object={nanGuard} />
         <Bloom mipmapBlur intensity={1.1} luminanceThreshold={0.2} luminanceSmoothing={0.3} />
         <Vignette offset={0.3} darkness={0.75} />
         <Noise opacity={0.025} />
