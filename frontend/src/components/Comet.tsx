@@ -62,7 +62,8 @@ export const Comet = forwardRef<CometHandle, Props>(function Comet({ state, hist
     } else {
       toWorld(state.personality, targetPos)
       emotionColor(state.emotion, targetColor)
-      easing.damp3(g.position, targetPos, 0.6, delta)
+      // A slow glide, so each answer reads as travel with the camera following.
+      easing.damp3(g.position, targetPos, 1.4, delta)
       easing.damp(l, 'energy', energyGlow(state.emotion.lightness), 0.6, delta)
       easing.damp(l, 'spread', meanUncertainty(state.uncertainty), 0.6, delta)
     }

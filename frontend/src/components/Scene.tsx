@@ -1,10 +1,10 @@
 import { useMemo, useRef } from 'react'
-import { Canvas, useFrame } from '@react-three/fiber'
-import { AdaptiveDpr, OrbitControls } from '@react-three/drei'
+import { Canvas } from '@react-three/fiber'
+import { AdaptiveDpr } from '@react-three/drei'
 import { Bloom, EffectComposer, Noise, ToneMapping, Vignette } from '@react-three/postprocessing'
 import { ToneMappingMode } from 'postprocessing'
-import { easing } from 'maath'
 import * as THREE from 'three'
+import { CameraRig, type CameraMode } from './CameraRig'
 import { Comet, type CometHandle } from './Comet'
 import { Constellations } from './Constellations'
 import { Dust } from './Dust'
@@ -14,10 +14,8 @@ import { Tail } from './Tail'
 import { emotionColor } from '../lib/color'
 import { createNanGuardPass } from '../lib/nanGuard'
 import type { CometState } from '../lib/schema'
-import { useReducedMotion } from '../hooks/useReducedMotion'
 
 const NEUTRAL_TINT = new THREE.Color(0.35, 0.3, 0.6)
-const IDLE_RESUME_SECONDS = 4
 
 interface Props {
   state: CometState | null
@@ -25,6 +23,8 @@ interface Props {
   isLoading: boolean
   demo: boolean
   chartMode: boolean
+  /** Whether the map (axes and labels) has been revealed. */
+  revealed: boolean
 }
 
 // The nebula is tinted by the average of every mood observed so far.
@@ -37,54 +37,14 @@ function moodTint(history: CometState[], state: CometState | null): THREE.Color 
   return sum.multiplyScalar(1 / moods.length)
 }
 
-type Controls = React.ComponentRef<typeof OrbitControls>
-
-// Slow orbit that eases out while the user drags and back in after they let go.
-function IdleOrbit({ demo }: { demo: boolean }) {
-  const controls = useRef<Controls>(null)
-  // endedAt is null until the frame loop stamps it with the clock's time.
-  const interaction = useRef<{ active: boolean; endedAt: number | null }>({ active: false, endedAt: -Infinity })
-  const reducedMotion = useReducedMotion()
-
-  useFrame(({ clock }, delta) => {
-    const c = controls.current
-    if (!c) return
-    const now = clock.getElapsedTime()
-    if (interaction.current.endedAt === null) interaction.current.endedAt = now
-    const { active, endedAt } = interaction.current
-    const idle = !active && now - endedAt > IDLE_RESUME_SECONDS
-    const target = reducedMotion || !idle ? 0 : demo ? 0.5 : 0.2
-    easing.damp(c, 'autoRotateSpeed', target, 1.5, delta)
-  })
-
-  return (
-    <OrbitControls
-      ref={controls}
-      makeDefault
-      enablePan={false}
-      enableDamping
-      dampingFactor={0.06}
-      minDistance={3}
-      maxDistance={14}
-      autoRotate
-      autoRotateSpeed={0}
-      onStart={() => {
-        interaction.current.active = true
-      }}
-      onEnd={() => {
-        interaction.current = { active: false, endedAt: null }
-      }}
-    />
-  )
-}
-
-export function Scene({ state, history, isLoading, demo, chartMode }: Props) {
+export function Scene({ state, history, isLoading, demo, chartMode, revealed }: Props) {
   const comet = useRef<CometHandle>(null)
   // Stable refs into the comet handle for the tail, which reads them every frame.
   const head = useMemo(() => ({ get current() { return comet.current?.group ?? null } }), [])
   const look = useMemo(() => ({ get current() { return comet.current?.look ?? null } }), [])
   const tint = useMemo(() => moodTint(history, state), [history, state])
   const nanGuard = useMemo(() => createNanGuardPass(), [])
+  const cameraMode: CameraMode = revealed ? 'map' : demo ? 'demo' : 'journey'
 
   return (
     <Canvas camera={{ position: [4.6, 2.4, 6.4], fov: 50 }} gl={{ antialias: true }} style={{ background: '#04040a' }}>
@@ -92,11 +52,11 @@ export function Scene({ state, history, isLoading, demo, chartMode }: Props) {
       <Nebula tint={tint} />
       <Starfield />
       <Dust />
-      <Constellations chartMode={chartMode} />
+      <Constellations chartMode={chartMode} revealed={revealed} />
       <Tail history={history} head={head} look={look} />
       <Comet ref={comet} state={state} history={history} isLoading={isLoading} demo={demo} />
 
-      <IdleOrbit demo={demo} />
+      <CameraRig mode={cameraMode} head={head} />
 
       <EffectComposer multisampling={4}>
         {/* Must run before bloom, which would otherwise smear one bad pixel over the frame. */}

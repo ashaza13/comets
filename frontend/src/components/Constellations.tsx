@@ -42,35 +42,48 @@ function axisDots(dir: THREE.Vector3, hex: string) {
   return geometry
 }
 
-function ConstellationAxis({ axis, chartMode, glow }: { axis: Axis; chartMode: boolean; glow: THREE.Texture }) {
+interface FadeProps {
+  chartMode: boolean
+  revealed: boolean
+}
+
+function ConstellationAxis({ axis, chartMode, revealed, glow }: FadeProps & { axis: Axis; glow: THREE.Texture }) {
   const dir = UNIT[axis.key]
   const dots = useMemo(() => axisDots(dir, axis.color), [dir, axis.color])
   const dotMaterial = useRef<THREE.PointsMaterial>(null)
   const line = useRef<Line2>(null)
   const labels = useRef<(TextMesh | null)[]>([])
-  const fade = useRef({ chart: chartMode ? 1 : 0 })
+  const group = useRef<THREE.Group>(null)
+  const poles = useRef<(THREE.SpriteMaterial | null)[]>([])
+  const fade = useRef({ chart: chartMode ? 1 : 0, reveal: revealed ? 1 : 0 })
   const viewDir = useMemo(() => new THREE.Vector3(), [])
 
   const end = (sign: number, k: number) => dir.clone().multiplyScalar(sign * k).toArray() as Vec3Tuple
 
   useFrame(({ camera }, delta) => {
     easing.damp(fade.current, 'chart', chartMode ? 1 : 0, 0.35, delta)
-    const chart = fade.current.chart
+    easing.damp(fade.current, 'reveal', revealed ? 1 : 0, 1.2, delta)
+    const { chart, reveal } = fade.current
+    if (group.current) group.current.visible = reveal > 0.01
+    if (reveal <= 0.01) return
     camera.getWorldDirection(viewDir)
     const visible = axisLabelVisibility(dir, viewDir)
 
-    if (dotMaterial.current) dotMaterial.current.opacity = 1 - 0.65 * chart
+    if (dotMaterial.current) dotMaterial.current.opacity = reveal * (1 - 0.65 * chart)
     if (line.current) {
-      line.current.material.opacity = 0.32 * chart
+      line.current.material.opacity = 0.32 * chart * reveal
       line.current.visible = chart > 0.01
     }
+    for (const pole of poles.current) {
+      if (pole) pole.opacity = reveal
+    }
     for (const label of labels.current) {
-      if (label) label.fillOpacity = visible * (0.42 + 0.43 * chart)
+      if (label) label.fillOpacity = visible * reveal * (0.42 + 0.43 * chart)
     }
   })
 
   return (
-    <group>
+    <group ref={group} visible={revealed}>
       <points geometry={dots}>
         <pointsMaterial
           ref={dotMaterial}
@@ -88,7 +101,16 @@ function ConstellationAxis({ axis, chartMode, glow }: { axis: Axis; chartMode: b
         <group key={sign} position={end(sign, EXTENT + 0.12)}>
           {/* A small star marks each pole of the constellation. */}
           <sprite scale={0.22}>
-            <spriteMaterial map={glow} color={axis.color} transparent depthWrite={false} blending={THREE.AdditiveBlending} />
+            <spriteMaterial
+              ref={(m) => {
+                poles.current[i] = m
+              }}
+              map={glow}
+              color={axis.color}
+              transparent
+              depthWrite={false}
+              blending={THREE.AdditiveBlending}
+            />
           </sprite>
           <Billboard position={dir.clone().multiplyScalar(sign * 0.3).toArray() as Vec3Tuple}>
             <Text
@@ -113,7 +135,7 @@ function ConstellationAxis({ axis, chartMode, glow }: { axis: Axis; chartMode: b
 }
 
 // Chart-mode graticule: three great circles, one per plane.
-function Rings({ chartMode }: { chartMode: boolean }) {
+function Rings({ chartMode, revealed }: FadeProps) {
   const lines = useRef<(Line2 | null)[]>([])
   const fade = useRef({ v: chartMode ? 1 : 0 })
   const circle = useMemo(
@@ -125,7 +147,7 @@ function Rings({ chartMode }: { chartMode: boolean }) {
     [],
   )
   useFrame((_, delta) => {
-    easing.damp(fade.current, 'v', chartMode ? 1 : 0, 0.35, delta)
+    easing.damp(fade.current, 'v', chartMode && revealed ? 1 : 0, 0.35, delta)
     for (const l of lines.current) {
       if (!l) continue
       l.material.opacity = 0.3 * fade.current.v
@@ -159,16 +181,17 @@ function Rings({ chartMode }: { chartMode: boolean }) {
 
 /**
  * The personality axes drawn as constellations: dotted arcs with a star at
- * each pole. Chart mode fades in solid axes and rings for reading exact values.
+ * each pole. They stay hidden until the map is revealed (every question
+ * answered). Chart mode then fades in solid axes and rings for exact values.
  */
-export function Constellations({ chartMode }: { chartMode: boolean }) {
+export function Constellations({ chartMode, revealed }: FadeProps) {
   const glow = useMemo(() => createGlowTexture(64), [])
   return (
     <>
       {AXES.map((a) => (
-        <ConstellationAxis key={a.key} axis={a} chartMode={chartMode} glow={glow} />
+        <ConstellationAxis key={a.key} axis={a} chartMode={chartMode} revealed={revealed} glow={glow} />
       ))}
-      <Rings chartMode={chartMode} />
+      <Rings chartMode={chartMode} revealed={revealed} />
     </>
   )
 }

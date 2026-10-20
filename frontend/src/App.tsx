@@ -2,6 +2,7 @@ import { lazy, Suspense, useState, useCallback, useMemo } from 'react'
 import { Scene } from './components/Scene'
 import { ChatPanel } from './components/ChatPanel'
 import { IntroFlow, INTRO_COMPLETE_AT } from './components/IntroFlow'
+import { isMapRevealed } from './lib/spec'
 import { useCometStore } from './store'
 
 type AppPhase = 'intro' | 'main'
@@ -28,6 +29,8 @@ export default function App() {
   const history = useMemo(() => entries.map((e) => e.state), [entries])
   const state = debugComet ?? history.at(-1) ?? null
   const demo = state === null
+  // The axes stay hidden until every question is answered (always shown in ?debug).
+  const revealed = DEBUG || isMapRevealed(entries.length)
 
   const leaveIntro = useCallback(() => {
     setIntroExiting(true)
@@ -74,7 +77,7 @@ export default function App() {
 
       {/* 3D scene — always rendered */}
       <div className="scene-container">
-        <Scene state={state} history={debugComet ? [] : history} isLoading={isLoading} demo={demo} chartMode={chartMode} />
+        <Scene state={state} history={debugComet ? [] : history} isLoading={isLoading} demo={demo} chartMode={chartMode} revealed={revealed} />
       </div>
 
       {/* Floating toggle button — visible in main phase when panel is closed */}
@@ -84,7 +87,7 @@ export default function App() {
         </button>
       )}
 
-      {phase === 'main' && (
+      {phase === 'main' && revealed && (
         <button className="chart-toggle-btn" onClick={toggleChart} aria-pressed={chartMode}>
           {chartMode ? '✦ sky' : '◎ chart'}
         </button>

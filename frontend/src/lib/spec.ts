@@ -30,3 +30,8 @@ export const SPACE_SCALE = 1.8
 export function domainColor(id: string): string {
   return DOMAIN_BY_ID[id]?.color ?? '#999'
 }
+
+/** The map (axes and labels) is revealed once every prompt has been answered. */
+export function isMapRevealed(answered: number): boolean {
+  return answered >= PROMPTS.length
+}
