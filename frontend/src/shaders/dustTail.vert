@@ -7,6 +7,7 @@ uniform float uTime;
 uniform float uSpread;
 uniform float uPixelRatio;
 uniform vec3 uTint;
+uniform float uColorSpan; // fraction of uColors the drawn curve covers
 
 attribute vec3 aSeed;
 
@@ -37,7 +38,7 @@ void main() {
   vec4 mv = modelViewMatrix * vec4(pos, 1.0);
   gl_Position = projectionMatrix * mv;
 
-  vec4 c = texture(uColors, vec2(u, 0.5));
+  vec4 c = texture(uColors, vec2(u * uColorSpan, 0.5));
   vColor = c.rgb * uTint;
   vAlpha = c.a * (1.0 - 0.7 * age) * step(1.5, uCount);
   gl_PointSize = min((0.8 + 2.2 * aSeed.z) * (1.0 - 0.4 * age) * uPixelRatio * max(6.0 / max(-mv.z, 0.5), 0.6), 32.0);

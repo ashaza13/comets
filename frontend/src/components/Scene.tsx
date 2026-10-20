@@ -17,7 +17,7 @@ import { Timeline } from './Timeline'
 import { emotionColor } from '../lib/color'
 import { journeyBounds } from '../lib/tail'
 import { createNanGuardPass } from '../lib/nanGuard'
-import { historyAt } from '../lib/playback'
+import { easeReplay, historyAt, journeyPath, playheadToT, tToPlayhead } from '../lib/playback'
 import { INITIAL_STATE, type CometState, type Entry } from '../lib/schema'
 
 const NEUTRAL_TINT = new THREE.Color(0.35, 0.3, 0.6)
@@ -46,8 +46,10 @@ interface Props {
   flyIn: boolean
 }
 
-// Answers per second while replaying the journey.
-const REPLAY_SPEED = 1.2
+// Replay speed in world units per second along the journey curve, within limits.
+const REPLAY_UNITS_PER_SECOND = 9
+const REPLAY_MIN_SECONDS = 4
+const REPLAY_MAX_SECONDS = 10
 
 export function Scene({ entries, debugState, isLoading, chartMode, revealed, showControls, flyIn }: Props) {
   const comet = useRef<CometHandle>(null)
@@ -59,6 +61,7 @@ export function Scene({ entries, debugState, isLoading, chartMode, revealed, sho
   const fullHistory = useMemo(() => entries.map((e) => e.state), [entries])
   const total = entries.length
   const mapFrame = useMemo(() => journeyBounds(fullHistory), [fullHistory])
+  const path = useMemo(() => journeyPath(fullHistory), [fullHistory])
 
   // Playhead over the journey: null is live; a number replays up to that point.
   const [playhead, setPlayhead] = useState<number | null>(null)
@@ -78,27 +81,42 @@ export function Scene({ entries, debugState, isLoading, chartMode, revealed, sho
     }
   }
 
+  // Replays travel the journey curve at a steady speed (by arc length), so the
+  // comet doesn't speed up or slow down as it passes each answer.
   useEffect(() => {
     if (!replay) return
+    if (!path) {
+      // Nothing to travel along: end the replay straight away.
+      const id = requestAnimationFrame(() => {
+        setPlayhead(null)
+        setReplay(null)
+      })
+      return () => cancelAnimationFrame(id)
+    }
+    const { curve } = path
+    const duration = Math.min(Math.max(curve.getLength() / REPLAY_UNITS_PER_SECOND, REPLAY_MIN_SECONDS), REPLAY_MAX_SECONDS)
     let frame = 0
     let startedAt: number | null = null
     const tick = (now: number) => {
       startedAt ??= now
-      const next = replay.from + ((now - startedAt) / 1000) * REPLAY_SPEED
-      if (next >= total) {
+      const progress = (now - startedAt) / 1000 / duration
+      if (progress >= 1) {
         setPlayhead(null)
         setReplay(null)
         return
       }
-      setPlayhead(next)
+      setPlayhead(tToPlayhead(path, curve.getUtoTmapping(easeReplay(progress), 0)))
       frame = requestAnimationFrame(tick)
     }
     frame = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(frame)
-  }, [replay, total])
+  }, [replay, path])
 
   const history = useMemo(() => (debugState ? [] : historyAt(fullHistory, playhead)), [debugState, fullHistory, playhead])
   const replaying = playhead !== null
+  // While replaying or scrubbing, the comet sits exactly on the journey curve.
+  const replayT = replaying && path ? playheadToT(path, playhead) : null
+  const cometPosition = useMemo(() => (path && replayT !== null ? path.curve.getPoint(replayT) : undefined), [path, replayT])
   const state = debugState ?? history.at(-1) ?? (replaying ? INITIAL_STATE : null)
   const demo = state === null
   // The axes appear once the reveal replay has finished; later scrubbing keeps them.
@@ -119,7 +137,7 @@ export function Scene({ entries, debugState, isLoading, chartMode, revealed, sho
         <Starfield />
         <SpaceDust />
         <Constellations chartMode={chartMode} revealed={mapShown} />
-        <Tail history={history} head={head} look={look} />
+        <Tail history={history} head={head} look={look} journey={path && replayT !== null ? { path, t: replayT } : null} />
         <MemoryStars entries={memories} total={total} interactive={mapShown} onHoverChange={setMemoryOpen} />
         <Comet
           ref={comet}
@@ -127,7 +145,7 @@ export function Scene({ entries, debugState, isLoading, chartMode, revealed, sho
           history={history}
           isLoading={isLoading}
           demo={demo}
-          glide={replaying ? 0.3 : 1.4}
+          position={cometPosition}
           hideTooltip={memoryOpen && mapShown}
           exact={chartMode && mapShown}
         />

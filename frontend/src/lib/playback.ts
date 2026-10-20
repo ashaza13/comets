@@ -1,4 +1,6 @@
+import * as THREE from 'three'
 import { INITIAL_STATE, type CometState } from './schema'
+import { toWorld } from './tail'
 
 /**
  * The journey can be replayed: a playhead runs from 0 (before the first
@@ -50,4 +52,81 @@ export function historyAt(history: CometState[], playhead: number | null): Comet
   if (t === 0) return history.slice(0, passed)
   const from = passed === 0 ? INITIAL_STATE : history[passed - 1]
   return [...history.slice(0, passed), lerpState(from, history[passed], t)]
+}
+
+// Points closer than this are treated as the same place on the curve.
+const SAME_PLACE = 1e-3
+
+/**
+ * The journey as one smooth curve through the origin and every distinct
+ * position. Answers that didn't move the comet (mood, topics, skipped cards)
+ * share their predecessor's place: repeating a point would make the curve
+ * stall and jerk there. `knots[i]` is the curve parameter t of control point i
+ * (0 = origin, i = after answer i), so the playhead can be mapped both ways.
+ */
+export interface JourneyPath {
+  curve: THREE.CatmullRomCurve3
+  knots: number[]
+  /** The distinct places, origin first. */
+  points: THREE.Vector3[]
+  /** State at each distinct place after the origin (the last answer there), for tail colours. */
+  states: CometState[]
+}
+
+export function journeyPath(history: CometState[]): JourneyPath | null {
+  const all = [new THREE.Vector3(), ...history.map((s) => toWorld(s.personality))]
+  const distinct: THREE.Vector3[] = []
+  const states: CometState[] = []
+  const index = all.map((p, i) => {
+    if (distinct.length === 0 || distinct[distinct.length - 1].distanceTo(p) > SAME_PLACE) distinct.push(p)
+    const j = distinct.length - 1
+    if (i > 0 && j > 0) states[j - 1] = history[i - 1]
+    return j
+  })
+  // Nowhere to travel: every answer so far left the comet where it started.
+  if (distinct.length < 2) return null
+  const curve = new THREE.CatmullRomCurve3(distinct, false, 'centripetal')
+  curve.arcLengthDivisions = 600
+  return { curve, knots: index.map((i) => i / (distinct.length - 1)), points: distinct, states }
+}
+
+/** Curve parameter for a playhead (clamped to the journey). */
+export function playheadToT(path: JourneyPath, playhead: number): number {
+  const { knots } = path
+  const p = Math.min(Math.max(playhead, 0), knots.length - 1)
+  const i = Math.min(Math.floor(p), knots.length - 2)
+  return knots[i] + (knots[i + 1] - knots[i]) * (p - i)
+}
+
+/**
+ * Playhead for a curve parameter. Answers that share a place count as passed
+ * together, so their memory stars appear as the comet arrives there.
+ */
+export function tToPlayhead(path: JourneyPath, t: number): number {
+  const { knots } = path
+  let i = 0
+  while (i < knots.length - 1 && knots[i + 1] <= t) i++
+  if (i >= knots.length - 1) return knots.length - 1
+  const span = knots[i + 1] - knots[i]
+  return span > 0 ? i + (t - knots[i]) / span : i
+}
+
+/** Smooth start and finish for the replay, constant speed in between. */
+export function easeReplay(x: number): number {
+  return x < 0.5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2
+}
+
+// Past points closer than this to the head are merged into it.
+const MERGE_DISTANCE = 0.05
+
+/**
+ * Control points for the live tail: every distinct place except the one the
+ * comet is heading for, then the comet itself. Right after an answer lands the
+ * comet is still sitting on the previous place; a near-duplicate control point
+ * there would kink the tail's end, so it is merged into the head.
+ */
+export function liveControlPoints(path: JourneyPath, head: THREE.Vector3): THREE.Vector3[] {
+  const past = path.points.slice(0, -1).map((p) => p.clone())
+  while (past.length > 1 && past[past.length - 1].distanceTo(head) < MERGE_DISTANCE) past.pop()
+  return [...past, head.clone()]
 }

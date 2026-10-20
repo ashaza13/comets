@@ -6,7 +6,8 @@ import fragmentShader from '../shaders/particle.frag'
 import vertexShader from '../shaders/dustTail.vert'
 import { packCurve, type CometLook } from '../lib/comet'
 import { mulberry32 } from '../lib/sky'
-import { tailControlPoints, tailTexture } from '../lib/tail'
+import { journeyPath, liveControlPoints, type JourneyPath } from '../lib/playback'
+import { tailTexture } from '../lib/tail'
 import { useReducedMotion } from '../hooks/useReducedMotion'
 import type { CometState } from '../lib/schema'
 
@@ -36,10 +37,25 @@ interface Props {
   head: RefObject<THREE.Group | null>
   /** Live comet appearance: colour for the motion trail, uncertainty for dust scatter. */
   look: RefObject<CometLook | null>
+  /**
+   * While replaying: the full journey path and how far along it the comet is
+   * (curve parameter t). The tail is then drawn as the curve's first t, so it
+   * grows smoothly instead of re-bending at each answer.
+   */
+  journey?: { path: JourneyPath; t: number } | null
 }
 
-export function Tail({ history, head, look }: Props) {
-  const recent = history.length === 0
+// Below this curve parameter the replayed tail is too short to draw.
+const MIN_REPLAY_T = 1e-4
+
+export function Tail({ history, head, look, journey = null }: Props) {
+  // Live tail follows the same path of distinct places as replays do.
+  const livePath = useMemo(() => (journey ? null : journeyPath(history)), [journey, history])
+  const path = journey?.path ?? livePath
+  const colorStates = useMemo(() => path?.states ?? [], [path])
+  const recent = !journey && history.length === 0
+  const lineMesh = useRef<THREE.Mesh>(null)
+  const dustPoints = useRef<THREE.Points>(null)
   const geometry = useRef<MeshLineGeometry>(null)
   const material = useRef<MeshLineMaterial>(null)
   const dustMaterial = useRef<THREE.ShaderMaterial>(null)
@@ -64,6 +80,7 @@ export function Tail({ history, head, look }: Props) {
       uSpread: { value: 1 },
       uPixelRatio: { value: 1 },
       uTint: { value: new THREE.Color(1, 1, 1) },
+      uColorSpan: { value: 1 },
     }),
     [],
   )
@@ -72,8 +89,8 @@ export function Tail({ history, head, look }: Props) {
 
   // Per-observation emotion colours along the ribbon's length.
   const colors = useMemo(
-    () => (recent ? new Uint8Array([255, 255, 255, 0, 255, 255, 255, 255]) : tailTexture(history)),
-    [history, recent],
+    () => (recent ? new Uint8Array([255, 255, 255, 0, 255, 255, 255, 255]) : tailTexture(colorStates)),
+    [colorStates, recent],
   )
 
   useFrame(({ size, clock }) => {
@@ -84,7 +101,21 @@ export function Tail({ history, head, look }: Props) {
     material.current.resolution.set(size.width, size.height)
 
     let points: THREE.Vector3[]
-    if (recent) {
+    // Fraction of the colour texture the drawn tail spans (less than 1 mid-replay).
+    let colorSpan = 1
+    // Nothing travelled yet (e.g. only the mood step so far): no tail to draw.
+    const drawn = recent || path !== null
+    if (lineMesh.current) lineMesh.current.visible = drawn
+    if (dustPoints.current) dustPoints.current.visible = drawn
+    if (!drawn) return
+
+    if (journey) {
+      sampled.current = []
+      const t = Math.max(journey.t, MIN_REPLAY_T)
+      points = Array.from({ length: SAMPLES + 1 }, (_, i) => journey.path.curve.getPoint((i / SAMPLES) * t))
+      colorSpan = t
+      material.current.color.set('white')
+    } else if (recent) {
       // No observations to draw: show the recent motion path behind the head.
       const trail = sampled.current
       if (trail.length === 0 || trail[trail.length - 1].distanceTo(headPos) > 0.004) {
@@ -95,10 +126,11 @@ export function Tail({ history, head, look }: Props) {
       material.current.color.copy(l.color)
     } else {
       sampled.current = []
-      points = new THREE.CatmullRomCurve3(tailControlPoints(history, headPos), false, 'centripetal').getPoints(SAMPLES)
+      points = new THREE.CatmullRomCurve3(liveControlPoints(path!, headPos), false, 'centripetal').getPoints(SAMPLES)
       material.current.color.set('white')
     }
     geometry.current.setPoints(points, taper)
+    material.current.repeat.set(colorSpan, 1)
 
     const dm = dustMaterial.current
     const tex = curve.current
@@ -108,6 +140,7 @@ export function Tail({ history, head, look }: Props) {
       dm.uniforms.uTime.value = clock.getElapsedTime() * (reducedMotion ? 0.2 : 1)
       dm.uniforms.uSpread.value = l.spread
       dm.uniforms.uPixelRatio.value = pixelRatio
+      dm.uniforms.uColorSpan.value = colorSpan
       if (recent) dm.uniforms.uTint.value.copy(l.color)
       else dm.uniforms.uTint.value.setRGB(1.3, 1.3, 1.3)
     }
@@ -116,7 +149,7 @@ export function Tail({ history, head, look }: Props) {
   const colorTexture = (attach: string) => (
     // Declared as a child so R3F owns its lifecycle; keyed so a new history gets a new texture.
     <dataTexture
-      key={colors.length + ':' + history.length}
+      key={colors.length + ':' + colorStates.length}
       attach={attach}
       args={[colors, colors.length / 4, 1, THREE.RGBAFormat]}
       colorSpace={THREE.SRGBColorSpace}
@@ -128,7 +161,7 @@ export function Tail({ history, head, look }: Props) {
 
   return (
     <>
-      <mesh frustumCulled={false}>
+      <mesh ref={lineMesh} frustumCulled={false}>
         <meshLineGeometry ref={geometry} />
         <meshLineMaterial
           ref={material}
@@ -145,7 +178,7 @@ export function Tail({ history, head, look }: Props) {
         </meshLineMaterial>
       </mesh>
 
-      <points frustumCulled={false}>
+      <points ref={dustPoints} frustumCulled={false}>
         <bufferGeometry>
           <bufferAttribute attach="attributes-position" args={[dust.positions, 3]} />
           <bufferAttribute attach="attributes-aSeed" args={[dust.seed, 3]} />

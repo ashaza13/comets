@@ -39,3 +39,77 @@ describe('lerpState', () => {
     expect(lerpState(at(0, 350), at(0, 10), 0.5).emotion.hue).toBeCloseTo(0)
   })
 })
+
+describe('journeyPath', () => {
+  it('passes through the origin and every observation at its knot', async () => {
+    const { journeyPath } = await import('../playback')
+    const { toWorld } = await import('../tail')
+    const path = journeyPath(history)!
+    expect(path.curve.getPoint(path.knots[0]).length()).toBeCloseTo(0)
+    history.forEach((s, i) => {
+      expect(path.curve.getPoint(path.knots[i + 1]).distanceTo(toWorld(s.personality))).toBeLessThan(1e-6)
+    })
+  })
+
+  it('gives answers that did not move the comet the same knot, and maps playheads both ways', async () => {
+    const { journeyPath, playheadToT, tToPlayhead } = await import('../playback')
+    // origin, stay (mood), move, stay (skip), move
+    const path = journeyPath([at(0, 60), at(0.5, 60), at(0.5, 60), at(-0.2, 60)])!
+    expect(path.knots).toEqual([0, 0, 0.5, 0.5, 1])
+    expect(playheadToT(path, 1.5)).toBeCloseTo(0.25)
+    expect(tToPlayhead(path, 0.25)).toBeCloseTo(1.5)
+    // Arriving at a shared place passes every answer there.
+    expect(tToPlayhead(path, 0.5)).toBe(3)
+    expect(tToPlayhead(path, 1)).toBe(4)
+  })
+
+  it('is null when there is nowhere to travel', async () => {
+    const { journeyPath } = await import('../playback')
+    expect(journeyPath([])).toBeNull()
+    expect(journeyPath([at(0, 60)])).toBeNull()
+  })
+})
+
+describe('replay motion', () => {
+  it('moves at a steady speed with no sharp turns, even through zig-zags', async () => {
+    const { journeyPath, easeReplay } = await import('../playback')
+    const p = (x: number, y: number, z: number) => ({ ...at(0, 0), personality: { x, y, z } })
+    // Sharp 3D turns (90°+ between legs), plus a step that doesn't move.
+    const zigzag = [p(0.4, 0.1, 0), p(0.3, 0.5, 0.2), p(-0.2, 0.3, 0.5), p(-0.2, 0.3, 0.5), p(-0.1, -0.3, 0.1), p(0.4, -0.2, -0.3)]
+    const { curve } = journeyPath(zigzag)!
+    const steps = 400
+    const points = Array.from({ length: steps + 1 }, (_, i) => curve.getPoint(curve.getUtoTmapping(i / steps, 0)))
+    const lengths = points.slice(1).map((p, i) => p.distanceTo(points[i]))
+    const mean = lengths.reduce((a, b) => a + b, 0) / lengths.length
+    // Constant speed by arc length: every step within 5% of the mean.
+    for (const l of lengths) expect(Math.abs(l - mean) / mean).toBeLessThan(0.05)
+    // Smooth direction: no step turns by more than 20 degrees.
+    for (let i = 1; i < steps; i++) {
+      const a = points[i].clone().sub(points[i - 1]).normalize()
+      const b = points[i + 1].clone().sub(points[i]).normalize()
+      expect((Math.acos(Math.min(1, a.dot(b))) * 180) / Math.PI).toBeLessThan(20)
+    }
+    expect(easeReplay(0)).toBe(0)
+    expect(easeReplay(1)).toBe(1)
+  })
+})
+
+describe('liveControlPoints', () => {
+  it('runs from the origin through past places to the head, skipping repeats', async () => {
+    const THREE = await import('three')
+    const { journeyPath, liveControlPoints } = await import('../playback')
+    const path = journeyPath([at(0, 60), at(0.5, 60), at(0.5, 60), at(-0.2, 60)])!
+    const head = new THREE.Vector3(9, 9, 9)
+    const pts = liveControlPoints(path, head)
+    expect(pts).toHaveLength(3)
+    expect(pts[0].length()).toBe(0)
+    expect(pts[2].equals(head)).toBe(true)
+    expect(path.states).toHaveLength(2)
+  })
+
+  it('merges the place the head is still sitting on', async () => {
+    const { journeyPath, liveControlPoints } = await import('../playback')
+    const path = journeyPath([at(0.5, 60), at(-0.5, 60)])!
+    expect(liveControlPoints(path, path.points[1].clone())).toHaveLength(2)
+  })
+})

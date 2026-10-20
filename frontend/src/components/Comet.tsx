@@ -26,8 +26,8 @@ interface Props {
   history: CometState[]
   isLoading: boolean
   demo: boolean
-  /** Smoothing time (s) for gliding to a new position; shorter during replays. */
-  glide?: number
+  /** Exact position to hold (replays and scrubbing); otherwise the comet voyages to its state. */
+  position?: THREE.Vector3
   /** Hide the hover tooltip (e.g. while a memory card is open). */
   hideTooltip?: boolean
   /** Show exact numbers in the tooltip (chart mode) instead of plain language. */
@@ -39,7 +39,7 @@ export interface CometHandle {
   look: CometLook
 }
 
-export const Comet = forwardRef<CometHandle, Props>(function Comet({ state, history, isLoading, demo, glide = 1.4, hideTooltip = false, exact = false }, ref) {
+export const Comet = forwardRef<CometHandle, Props>(function Comet({ state, history, isLoading, demo, position, hideTooltip = false, exact = false }, ref) {
   const [hovered, setHovered] = useState(false)
   const group = useRef<THREE.Group>(null)
   const look = useRef(createLook())
@@ -76,9 +76,9 @@ export const Comet = forwardRef<CometHandle, Props>(function Comet({ state, hist
       toWorld(state.personality, targetPos)
       emotionColor(state.emotion, targetColor)
       const v = travel.current
-      if (glide < 1) {
-        // Replays and scrubbing: track the playhead closely.
-        easing.damp3(g.position, targetPos, glide, delta)
+      if (position) {
+        // Replays and scrubbing: sit exactly on the journey curve.
+        g.position.copy(position)
         v.to.copy(targetPos)
         v.active = false
       } else {
@@ -101,7 +101,8 @@ export const Comet = forwardRef<CometHandle, Props>(function Comet({ state, hist
 
     if (delta > 0) l.velocity.subVectors(g.position, previous).divideScalar(delta)
     // Heading: the last move between observations, or the live motion in demo mode.
-    if (historyHeading && !demo) targetHeading.copy(historyHeading)
+    // While replaying, the heading follows the curve's direction instead.
+    if (historyHeading && !demo && !position) targetHeading.copy(historyHeading)
     else if (l.velocity.lengthSq() > 1e-4) targetHeading.copy(l.velocity).normalize()
     easing.damp3(l.heading, targetHeading, 0.4, delta)
     if (l.heading.lengthSq() > 1e-8) l.heading.normalize()

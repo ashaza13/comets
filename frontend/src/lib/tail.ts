@@ -8,16 +8,6 @@ export function toWorld(p: CometState['personality'], target = new THREE.Vector3
 }
 
 /**
- * Control points for the tail: it starts at the origin (before anything was
- * known), passes through every past observation and ends at the live head.
- * The latest observation is replaced by the head, which is easing towards it.
- */
-export function tailControlPoints(history: CometState[], head: THREE.Vector3): THREE.Vector3[] {
-  const past = [INITIAL_STATE, ...history].slice(0, -1).map((s) => toWorld(s.personality))
-  return [...past, head.clone()]
-}
-
-/**
  * One RGBA texel per control point: the emotion colour the person had at that
  * moment, fading towards the oldest end. Sampled along the ribbon's length.
  */
