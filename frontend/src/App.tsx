@@ -83,7 +83,7 @@ export default function App() {
       {/* Floating toggle button — visible in main phase when panel is closed */}
       {phase === 'main' && !chatOpen && (
         <button className="chat-open-btn" onClick={() => setChatOpen(true)}>
-          ≡ signals
+          Signals
         </button>
       )}
 
@@ -91,7 +91,7 @@ export default function App() {
 
       {phase === 'main' && revealed && (
         <button className="chart-toggle-btn" onClick={toggleChart} aria-pressed={chartMode}>
-          {chartMode ? '✦ sky' : '◎ chart'}
+          {chartMode ? 'Sky view' : 'Chart view'}
         </button>
       )}
 

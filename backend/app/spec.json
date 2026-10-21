@@ -6,7 +6,7 @@
       "negative": "introvert",
       "positive": "extrovert",
       "description": "how much you seek out people and attention",
-      "color": "#ff6b6b"
+      "color": "#de7f66"
     },
     {
       "key": "y",
@@ -14,7 +14,7 @@
       "negative": "concrete",
       "positive": "abstract",
       "description": "how drawn you are to ideas and complex problems",
-      "color": "#6bff9e"
+      "color": "#93c08c"
     },
     {
       "key": "z",
@@ -22,7 +22,7 @@
       "negative": "practical",
       "positive": "imaginative",
       "description": "how much you live in images, art and daydreams",
-      "color": "#6bb5ff"
+      "color": "#80a7da"
     }
   ],
   "domains": [

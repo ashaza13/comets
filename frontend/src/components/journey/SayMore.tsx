@@ -66,7 +66,7 @@ export function SayMore({ prompt, isLoading, onSend }: Props) {
   if (!open) {
     return (
       <button className="journey-link" onClick={() => setOpen(true)}>
-        ✎ say more
+        Add a note in your own words
       </button>
     )
   }
@@ -90,7 +90,7 @@ export function SayMore({ prompt, isLoading, onSend }: Props) {
       <div className="saymore-actions">
         {Speech && (
           <button className={`saymore-mic ${listening ? 'saymore-mic--on' : ''}`} onClick={toggleListening} aria-pressed={listening}>
-            {listening ? '● listening' : '🎙 speak'}
+            {listening ? 'Listening…' : 'Dictate'}
           </button>
         )}
         <button className="journey-link" onClick={() => setOpen(false)}>

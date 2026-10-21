@@ -25,7 +25,7 @@ export function ResultCard({ state, exact, onReplay }: Props) {
   if (!open) {
     return (
       <button className="result-chip" onClick={() => setOpen(true)}>
-        ✦ your comet
+        Your reading
       </button>
     )
   }
@@ -46,16 +46,16 @@ export function ResultCard({ state, exact, onReplay }: Props) {
         const v = state.personality[a.key]
         const sd = Math.sqrt(state.uncertainty[a.key])
         return (
-          <div key={a.key} className="result-axis">
+          <div key={a.key} className="result-axis" style={{ ['--axis' as string]: a.color }}>
             <div className="result-axis-head">
-              <span style={{ color: a.color }}>{a.name}</span>
+              <span className="result-axis-name">{a.name}</span>
               <span className="dim">
                 {exact ? `${v >= 0 ? '+' : ''}${v.toFixed(2)} ±${sd.toFixed(2)}` : describeAxis(a, v)}
               </span>
             </div>
             <div className="result-scale">
               <span className="result-pole">{a.negative}</span>
-              <div className="result-track" style={{ ['--axis' as string]: a.color }}>
+              <div className="result-track">
                 {/* The band is how sure the estimate is; the dot is where it sits. */}
                 <div className="result-band" style={{ left: percent(v - sd), right: `calc(100% - ${percent(v + sd)})` }} />
                 <div className="result-centre" />
@@ -70,7 +70,7 @@ export function ResultCard({ state, exact, onReplay }: Props) {
 
       <div className="result-row">
         <span className="dim">feeling</span>
-        <span className="result-feeling" style={{ color: emotionCss(state.emotion) }}>
+        <span className="result-feeling">
           <span className="nt-swatch" style={{ background: emotionCss(state.emotion) }} />
           {describeEmotion(state.emotion)}
         </span>
@@ -81,7 +81,7 @@ export function ResultCard({ state, exact, onReplay }: Props) {
           <span className="dim">loves</span>
           <span className="result-tags">
             {topInterests.map(([domain, depth]) => (
-              <span key={domain} className="interest-tag" style={{ borderColor: domainColor(domain), color: domainColor(domain) }}>
+              <span key={domain} className="interest-tag" style={{ ['--tag' as string]: domainColor(domain) }}>
                 {domain} {exact ? depth.toFixed(2) : `· ${describeDepth(depth)}`}
               </span>
             ))}
@@ -92,7 +92,7 @@ export function ResultCard({ state, exact, onReplay }: Props) {
       <footer className="result-foot">
         <span className="dim">Hover the stars on your trail to revisit each answer.</span>
         <button className="result-replay" onClick={onReplay}>
-          ▶ replay
+          Replay journey
         </button>
       </footer>
     </section>

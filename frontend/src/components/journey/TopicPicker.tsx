@@ -30,7 +30,7 @@ export function TopicPicker({ onDone }: Props) {
             <button
               key={d.id}
               className={`topic ${on ? 'topic--on' : ''}`}
-              style={{ ['--topic' as string]: d.color, opacity: on ? 0.55 + 0.15 * level : undefined }}
+              style={{ ['--topic' as string]: d.color }}
               onClick={() => cycle(d.id)}
               aria-pressed={on}
             >
@@ -41,7 +41,7 @@ export function TopicPicker({ onDone }: Props) {
         })}
       </div>
       <button className="journey-primary" onClick={() => onDone(picks)}>
-        {count ? `Done — ${count} picked` : 'None of these'}
+        {count ? `Done, ${count} picked` : 'None of these'}
       </button>
     </div>
   )

@@ -40,7 +40,7 @@ function SignalReadout({ observation, exact }: { observation: Observation; exact
       {interests.length > 0 && (
         <div className="readout-interests">
           {interests.map((i) => (
-            <span key={i.domain} className="interest-tag" style={{ borderColor: domainColor(i.domain), color: domainColor(i.domain) }}>
+            <span key={i.domain} className="interest-tag" style={{ ['--tag' as string]: domainColor(i.domain) }}>
               {i.domain} {exact ? i.depth.toFixed(2) : `· ${describeDepth(i.depth)}`}
             </span>
           ))}
@@ -73,8 +73,8 @@ function StatePanel({ state, exact }: { state: CometState; exact: boolean }) {
         const note = certaintyNote(state.uncertainty[a.key])
         return (
           <div key={a.key} className="state-row">
-            {exact && <span className="dim">{a.name}</span>}
-            <span style={{ color: a.color }}>
+            <span className="dim state-axis">{a.name}</span>
+            <span className="state-value">
               {exact ? (
                 <>
                   {signed(v)}
@@ -93,7 +93,7 @@ function StatePanel({ state, exact }: { state: CometState; exact: boolean }) {
         )
       })}
       <div className="state-row">
-        <span className="dim">feeling</span>
+        <span className="dim state-axis">feeling</span>
         <span style={{ color: emotionCss(state.emotion) }}>
           {exact
             ? `${state.emotion.hue.toFixed(0)}° · ${(state.emotion.saturation * 100).toFixed(0)}% · energy ${(state.emotion.lightness * 100).toFixed(0)}%`
@@ -102,10 +102,10 @@ function StatePanel({ state, exact }: { state: CometState; exact: boolean }) {
       </div>
       {topInterests.length > 0 && (
         <div className="state-row interests-row">
-          <span className="dim">loves</span>
+          <span className="dim state-axis">loves</span>
           <span>
             {topInterests.map(([domain, depth]) => (
-              <span key={domain} className="interest-tag" style={{ borderColor: domainColor(domain), color: domainColor(domain) }}>
+              <span key={domain} className="interest-tag" style={{ ['--tag' as string]: domainColor(domain) }}>
                 {domain} {exact ? depth.toFixed(2) : `· ${describeDepth(depth)}`}
               </span>
             ))}

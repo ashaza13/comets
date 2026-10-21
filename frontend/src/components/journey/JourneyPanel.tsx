@@ -40,10 +40,13 @@ export function JourneyPanel({ entries, isLoading, error }: Props) {
 
   return (
     <div className="journey" role="region" aria-label="Journey">
-      <div className="journey-progress" aria-label={`Step ${done + 1} of ${JOURNEY_STEPS}`}>
-        {Array.from({ length: JOURNEY_STEPS }, (_, i) => (
-          <span key={i} className={`journey-dot ${i < done ? 'journey-dot--done' : i === done ? 'journey-dot--now' : ''}`} />
-        ))}
+      <div className="journey-progress">
+        <div className="journey-progress-track" aria-hidden>
+          <div className="journey-progress-fill" style={{ width: `${(done / JOURNEY_STEPS) * 100}%` }} />
+        </div>
+        <span>
+          {done + 1} of {JOURNEY_STEPS}
+        </span>
       </div>
 
       {kind === 'statement' && <div className="journey-hint">How well does this describe you, as you generally are?</div>}

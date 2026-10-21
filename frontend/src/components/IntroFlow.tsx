@@ -88,7 +88,7 @@ export function IntroFlow({ exiting, onDone }: Props) {
   return (
     <div className={`intro-overlay ${exiting ? 'intro-overlay--exiting' : ''}`}>
       <button className="intro-skip" onClick={onDone} tabIndex={0}>
-        skip →
+        Skip intro
       </button>
 
       <div className={`intro-content ${contentVisible ? 'intro-content--visible' : ''}`}>

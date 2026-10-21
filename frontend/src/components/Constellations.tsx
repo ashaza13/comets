@@ -3,7 +3,7 @@ import { Billboard, Line, Text } from '@react-three/drei'
 import { useFrame } from '@react-three/fiber'
 import { easing } from 'maath'
 import * as THREE from 'three'
-import fontUrl from '@fontsource/space-mono/files/space-mono-latin-400-normal.woff?url'
+import fontUrl from '@fontsource/newsreader/files/newsreader-latin-400-italic.woff?url'
 import { AXES, SPACE_SCALE, type Axis, type Vec3Tuple } from '../lib/spec'
 import { axisLabelVisibility } from '../lib/sky'
 import { createGlowTexture } from '../lib/textures'
@@ -12,7 +12,7 @@ const EXTENT = SPACE_SCALE * 1.55
 const DOT_SPACING = EXTENT / 25
 const RING_RADIUS = SPACE_SCALE * 1.67
 // Label height as a fraction of its distance from the camera.
-const LABEL_SIZE = 0.022
+const LABEL_SIZE = 0.028
 
 const UNIT: Record<Axis['key'], THREE.Vector3> = {
   x: new THREE.Vector3(1, 0, 0),
@@ -82,7 +82,7 @@ function ConstellationAxis({ axis, chartMode, revealed, glow }: FadeProps & { ax
       if (pole) pole.opacity = reveal
     }
     for (const label of labels.current) {
-      if (label) label.fillOpacity = visible * reveal * (0.42 + 0.43 * chart)
+      if (label) label.fillOpacity = visible * reveal * (0.55 + 0.35 * chart)
     }
     // Scale labels with their distance from the camera so they read at a
     // constant size, whether the pole is far away or right beside the camera.
@@ -139,8 +139,8 @@ function ConstellationAxis({ axis, chartMode, revealed, glow }: FadeProps & { ax
               color={axis.color}
               anchorX="center"
               anchorY="middle"
-              letterSpacing={0.08}
-              fillOpacity={0.42}
+              letterSpacing={0.01}
+              fillOpacity={0.55}
             >
               {sign < 0 ? axis.negative : axis.positive}
             </Text>
