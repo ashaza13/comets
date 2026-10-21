@@ -55,3 +55,32 @@ export function packCurve(points: THREE.Vector3[], out: Float32Array): number {
   for (let i = 0; i < n; i++) out.set([points[i].x, points[i].y, points[i].z, 1], i * 4)
   return n
 }
+
+/**
+ * One step of a critically damped spring (Unity's SmoothDamp) towards a target.
+ * The velocity carries over between calls, so changing the target mid-flight
+ * curves the comet onto its new course instead of stopping and restarting it.
+ * Mutates `position` and `velocity`.
+ */
+export function springStep(
+  position: THREE.Vector3,
+  velocity: THREE.Vector3,
+  target: THREE.Vector3,
+  smoothTime: number,
+  delta: number,
+  maxSpeed = Infinity,
+): void {
+  if (delta <= 0) return
+  const omega = 2 / smoothTime
+  const x = omega * delta
+  const decay = 1 / (1 + x + 0.48 * x * x + 0.235 * x * x * x)
+  const change = springChange.subVectors(position, target)
+  const maxChange = maxSpeed * smoothTime
+  if (change.lengthSq() > maxChange * maxChange) change.setLength(maxChange)
+  const temp = springTemp.copy(change).multiplyScalar(omega).add(velocity).multiplyScalar(delta)
+  velocity.addScaledVector(temp, -omega).multiplyScalar(decay)
+  position.copy(target).add(change.add(temp).multiplyScalar(decay))
+}
+
+const springChange = new THREE.Vector3()
+const springTemp = new THREE.Vector3()
