@@ -20,8 +20,9 @@ describe('tailTexture', () => {
 })
 
 describe('journeyBounds', () => {
-  it('encloses the origin and every observation', () => {
+  it('centres on the final position and encloses the origin and every observation', () => {
     const sphere = journeyBounds([at(1), at(-0.5)])
+    expect(sphere.center.x).toBeCloseTo(-0.5 * SPACE_SCALE)
     for (const x of [0, SPACE_SCALE, -0.5 * SPACE_SCALE]) {
       expect(sphere.distanceToPoint(new THREE.Vector3(x, 0, 0))).toBeLessThanOrEqual(1e-6)
     }

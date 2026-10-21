@@ -155,8 +155,11 @@ take an optional **say more**, typed or dictated, which Claude reads on the back
 
 While you answer, the camera travels with the comet and the axes stay hidden; each answer fires a
 flare and the comet glides to its new position, leaving a memory star behind. After the last step
-the journey replays from the start, then the axes fade in around it. Hover a memory star to read
-that answer back, and use the timeline to scrub or replay the journey. Readings are shown in plain
+the journey replays from the start with the camera riding along, then it pulls back to the comet's
+final place and the axes fade in around it. Dashed lines drop from the comet to each axis, and a
+"where you landed" card reads out each dimension on a scale, with a band for how sure the estimate
+is, plus the feeling and interests. Hover a memory star to read that answer back, and use the
+timeline to scrub or replay the journey. Readings are shown in plain
 language ("leaning introvert"); chart mode shows the exact numbers.
 
 Personality is estimated with a per-axis Kalman filter, so repeated readings converge on

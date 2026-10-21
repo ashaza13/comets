@@ -7,15 +7,17 @@ import * as THREE from 'three'
 import { CameraRig, type CameraMode } from './CameraRig'
 import { Comet, type CometHandle } from './Comet'
 import { Constellations } from './Constellations'
+import { FinalMarker } from './FinalMarker'
 import { Flare } from './Flare'
 import { MemoryStars } from './MemoryStars'
 import { Nebula } from './Nebula'
+import { ResultCard } from './ResultCard'
 import { SpaceDust } from './SpaceDust'
 import { Starfield } from './Starfield'
 import { Tail } from './Tail'
 import { Timeline } from './Timeline'
 import { emotionColor } from '../lib/color'
-import { journeyBounds } from '../lib/tail'
+import { journeyBounds, toWorld } from '../lib/tail'
 import { createNanGuardPass } from '../lib/nanGuard'
 import { easeReplay, historyAt, journeyPath, playheadToT, tToPlayhead } from '../lib/playback'
 import { INITIAL_STATE, type CometState, type Entry } from '../lib/schema'
@@ -62,6 +64,8 @@ export function Scene({ entries, debugState, isLoading, chartMode, revealed, sho
   const total = entries.length
   const mapFrame = useMemo(() => journeyBounds(fullHistory), [fullHistory])
   const path = useMemo(() => journeyPath(fullHistory), [fullHistory])
+  const finalState = fullHistory.at(-1)
+  const finalPosition = useMemo(() => (finalState ? toWorld(finalState.personality) : null), [finalState])
 
   // Playhead over the journey: null is live; a number replays up to that point.
   const [playhead, setPlayhead] = useState<number | null>(null)
@@ -122,8 +126,17 @@ export function Scene({ entries, debugState, isLoading, chartMode, revealed, sho
   // The axes appear once the reveal replay has finished; later scrubbing keeps them.
   const mapShown = revealed && !replay?.reveal
   // ?debug tunes the comet up close, so it follows the comet even though the map is shown.
-  const cameraMode: CameraMode = debugState ? 'journey' : revealed ? 'map' : demo ? 'demo' : 'journey'
+  // Replays ride along with the comet; afterwards the camera pulls back to show the map.
+  const cameraMode: CameraMode = debugState ? 'journey' : replay ? 'replay' : revealed ? 'map' : demo ? 'demo' : 'journey'
   const tint = useMemo(() => moodTint(history, state), [history, state])
+
+  // The result is marked once the map is shown and the comet is back at its final place.
+  const showResult = mapShown && !debugState && total > 0
+
+  const startReplay = () => {
+    setReplay({ from: 0, reveal: false })
+    setPlayhead(0)
+  }
 
   // Memory stars for answers already passed; the live comet itself marks the latest.
   const passed = playhead === null ? Math.max(total - 1, 0) : Math.floor(playhead)
@@ -150,6 +163,7 @@ export function Scene({ entries, debugState, isLoading, chartMode, revealed, sho
           exact={chartMode && mapShown}
         />
         <Flare count={total} head={head} look={look} />
+        {finalPosition && <FinalMarker position={finalPosition} shown={showResult && playhead === null} />}
 
         <CameraRig mode={cameraMode} head={head} flyIn={flyIn} mapFrame={mapFrame} />
 
@@ -172,11 +186,12 @@ export function Scene({ entries, debugState, isLoading, chartMode, revealed, sho
             setReplay(null)
             setPlayhead(value >= total ? null : value)
           }}
-          onPlay={() => {
-            setReplay({ from: 0, reveal: false })
-            setPlayhead(0)
-          }}
+          onPlay={startReplay}
         />
+      )}
+
+      {showControls && showResult && !replay && finalState && (
+        <ResultCard state={finalState} exact={chartMode} onReplay={startReplay} />
       )}
     </>
   )

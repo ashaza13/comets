@@ -27,10 +27,13 @@ export function meanUncertainty(u: CometState['uncertainty']): number {
 }
 
 /**
- * Bounding sphere of the journey (origin plus every observation), used to frame
- * the map so the path fills the view however far or near it travelled.
+ * The map's framing: a sphere centred on where the journey ended, just large
+ * enough to hold the origin and every observation. The camera orbits the final
+ * position, so the comet stays the focus while the whole path fits in view.
  */
 export function journeyBounds(history: CometState[]): THREE.Sphere {
   const points = [new THREE.Vector3(), ...history.map((s) => toWorld(s.personality))]
-  return new THREE.Box3().setFromPoints(points).getBoundingSphere(new THREE.Sphere())
+  const center = points[points.length - 1].clone()
+  const radius = Math.max(...points.map((p) => p.distanceTo(center)))
+  return new THREE.Sphere(center, radius)
 }

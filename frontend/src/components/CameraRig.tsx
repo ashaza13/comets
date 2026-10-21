@@ -8,13 +8,18 @@ import { useReducedMotion } from '../hooks/useReducedMotion'
 /**
  * - demo: no answers yet; the camera holds still while the comet wanders.
  * - journey: answering questions; the camera travels with the comet.
- * - map: every question answered; the camera centres on the whole space.
+ * - replay: the journey is replaying; the camera rides along close behind.
+ * - map: every question answered; the camera orbits the comet's final place,
+ *   pulled back far enough to show the whole journey.
  */
-export type CameraMode = 'demo' | 'journey' | 'map'
+export type CameraMode = 'demo' | 'journey' | 'replay' | 'map'
 
 // Framing distance per mode; the map's comes from the journey's size.
-const DISTANCE: Record<Exclude<CameraMode, 'map'>, number> = { demo: 8.4, journey: 6.5 }
-const ZOOM_LIMIT: Record<CameraMode, number> = { demo: 14, journey: 14, map: 160 }
+const DISTANCE: Record<Exclude<CameraMode, 'map'>, number> = { demo: 8.4, journey: 6.5, replay: 9 }
+const ZOOM_LIMIT: Record<CameraMode, number> = { demo: 14, journey: 14, replay: 30, map: 160 }
+// How closely the orbit target trails the comet (smoothing time, seconds). Replays
+// travel faster than live voyages, so the camera keeps up more tightly.
+const FOLLOW: Record<CameraMode, number> = { demo: 1.4, journey: 0.6, replay: 0.12, map: 0.8 }
 const MAP_MIN_DISTANCE = 16
 // How long the camera eases towards a mode's framing distance after the mode changes.
 const FRAMING_SECONDS = 3
@@ -73,11 +78,10 @@ export function CameraRig({ mode, head, flyIn = false, mapFrame }: Props) {
     // Follow: move the orbit target to the comet and carry the camera along by
     // the same amount, so the user's chosen angle and zoom are kept.
     const { goal, before, offset } = tmp
-    if (mode === 'journey' && head.current) goal.copy(head.current.position)
-    else if (mode === 'map' && mapFrame) goal.copy(mapFrame.center)
+    if (mode !== 'demo' && head.current) goal.copy(head.current.position)
     else goal.copy(ORIGIN)
     before.copy(c.target)
-    easing.damp3(c.target, goal, mode === 'journey' ? 0.6 : 1.4, delta)
+    easing.damp3(c.target, goal, FOLLOW[mode], delta)
     camera.position.add(offset.subVectors(c.target, before))
 
     // Ease to the mode's framing distance, unless the user takes over.
@@ -104,7 +108,7 @@ export function CameraRig({ mode, head, flyIn = false, mapFrame }: Props) {
       easing.damp(m, 'speed', speed, 0.4, delta)
     }
     const perspective = camera as THREE.PerspectiveCamera
-    const fov = mode === 'journey' && !reducedMotion ? BASE_FOV + WARP_FOV * THREE.MathUtils.smoothstep(m.speed, 0.5, 8) : BASE_FOV
+    const fov = (mode === 'journey' || mode === 'replay') && !reducedMotion ? BASE_FOV + WARP_FOV * THREE.MathUtils.smoothstep(m.speed, 0.5, 8) : BASE_FOV
     if (Math.abs(perspective.fov - fov) > 0.01) {
       easing.damp(perspective, 'fov', fov, 0.5, delta)
       perspective.updateProjectionMatrix()
