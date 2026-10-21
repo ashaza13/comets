@@ -2,26 +2,26 @@
   "axes": [
     {
       "key": "x",
-      "name": "social orientation",
+      "name": "extraversion",
       "negative": "introvert",
       "positive": "extrovert",
-      "description": "how you relate to the world",
+      "description": "how much you seek out people and attention",
       "color": "#ff6b6b"
     },
     {
       "key": "y",
-      "name": "cognitive style",
+      "name": "intellect",
       "negative": "concrete",
       "positive": "abstract",
-      "description": "how you think and explain",
+      "description": "how drawn you are to ideas and complex problems",
       "color": "#6bff9e"
     },
     {
       "key": "z",
-      "name": "engagement mode",
-      "negative": "analytical",
-      "positive": "creative",
-      "description": "how you make and decide",
+      "name": "imagination",
+      "negative": "practical",
+      "positive": "imaginative",
+      "description": "how much you live in images, art and daydreams",
       "color": "#6bb5ff"
     }
   ],

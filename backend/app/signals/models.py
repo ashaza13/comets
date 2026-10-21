@@ -33,7 +33,7 @@ class PersonalityReading(BaseModel):
 
     x: Signed | None = Field(None, description="-1 introverted … +1 extroverted, null if no signal")
     y: Signed | None = Field(None, description="-1 concrete … +1 abstract, null if no signal")
-    z: Signed | None = Field(None, description="-1 analytical … +1 creative, null if no signal")
+    z: Signed | None = Field(None, description="-1 practical … +1 imaginative, null if no signal")
 
 
 class EmotionReading(BaseModel):

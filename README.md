@@ -62,11 +62,14 @@ Each signal type maps to a distinct visual channel, keeping them perceptually se
 
 The three spatial axes correspond to the personality dimensions that capture the most variance while remaining close to orthogonal:
 
-- **X-axis** — Social orientation (introvert ↔ extrovert)
-- **Y-axis** — Cognitive style (concrete/pragmatic ↔ abstract/philosophical)
-- **Z-axis** — Engagement mode (analytical ↔ creative/expressive)
+- **X-axis** — Extraversion (introvert ↔ extrovert)
+- **Y-axis** — Intellect (concrete ↔ abstract: drawn to ideas and complex problems)
+- **Z-axis** — Imagination (practical ↔ imaginative: images, art and daydreams)
 
-Someone can be both deeply analytical and deeply creative — that combination places them in a specific, valid region of the space rather than forcing a choice.
+These follow established personality research: x is Big Five Extraversion, and y and z are the two
+sides of Openness/Intellect that DeYoung, Quilty and Peterson (2007) separate into the Intellect and
+Openness aspects. They correlate, but someone can love abstract problems without caring for art, or
+the reverse, and that combination places them in a distinct region of the space.
 
 #### Color Space (Emotion → HSL)
 
@@ -138,9 +141,11 @@ About a minute of taps, no typing required:
 
 1. **Mood wheel**: tap a colour; the angle is the kind of feeling, the distance from the centre how
    strongly you feel it. A slider sets energy.
-2. **This-or-that cards** (8): two short scenes; tap the one that pulls you. Each option is pre-scored
-   on the personality axes (`frontend/src/lib/cards.ts`), and the next card is chosen to target the
-   axis the estimate is least sure about.
+2. **Statements** (12): rate how well each describes you, from *very inaccurate* to *very accurate*.
+   They are validated, public-domain items from the [International Personality Item Pool](https://ipip.ori.org),
+   four per axis with two keyed each way, so agreeing with everything doesn't move the comet
+   (`frontend/src/lib/statements.ts`). A rating of 1–5 reads as −1…1 on the item's axis (reversed for
+   negatively keyed items), and the Kalman update averages them into the estimate.
 3. **Topics**: tap what lights you up; tap again to go deeper (curious, into it, obsessed).
 
 Taps are scored in the browser with a TypeScript port of the backend's update math

@@ -1,16 +1,16 @@
-import type { Card, CardOption } from './cards'
 import type { Entry, Observation } from './schema'
+import { RESPONSES, STATEMENTS, statementReading, statementText, type Statement } from './statements'
 
-// The journey: one mood check, a run of this-or-that cards, then interests.
-export const CARD_STEPS = 8
-export const JOURNEY_STEPS = 1 + CARD_STEPS + 1
+// The journey: one mood check, the personality statements, then interests.
+export const STATEMENT_STEPS = STATEMENTS.length
+export const JOURNEY_STEPS = 1 + STATEMENT_STEPS + 1
 
-export type StepKind = 'mood' | 'card' | 'topics'
+export type StepKind = 'mood' | 'statement' | 'topics'
 
 export function stepKind(completed: number): StepKind | null {
   if (completed === 0) return 'mood'
-  if (completed <= CARD_STEPS) return 'card'
-  if (completed === CARD_STEPS + 1) return 'topics'
+  if (completed <= STATEMENT_STEPS) return 'statement'
+  if (completed === STATEMENT_STEPS + 1) return 'topics'
   return null
 }
 
@@ -35,19 +35,22 @@ export function moodObservation(hue: number, intensity: number, energy: number):
   }
 }
 
-export function cardObservation(card: Card, chosen: CardOption): Observation {
-  const other = chosen === card.a ? card.b : card.a
+// One rating is a noisy measurement; four per axis add up to a fair estimate.
+const STATEMENT_CONFIDENCE = 0.7
+
+/** A 1–5 rating of a statement, or null when it was skipped (counts as a step, tells us nothing). */
+export function statementObservation(statement: Statement, response: number | null): Observation {
+  const personality: Observation['personality'] = { x: null, y: null, z: null }
+  if (response !== null) personality[statement.axis] = statementReading(statement, response)
   return {
-    personality: {
-      x: chosen.loadings.x ?? null,
-      y: chosen.loadings.y ?? null,
-      z: chosen.loadings.z ?? null,
-    },
+    personality,
     emotion: NO_EMOTION,
     interests: [],
-    // A single forced choice is a noisy measurement; the estimate firms up as they add up.
-    confidence: 0.55,
-    reasoning: `Picked “${chosen.label}” over “${other.label}”.`,
+    confidence: response === null ? 0 : STATEMENT_CONFIDENCE,
+    reasoning:
+      response === null
+        ? 'Skipped.'
+        : `Rated “${statementText(statement)}” as ${RESPONSES[response - 1].toLowerCase()}.`,
   }
 }
 
@@ -72,6 +75,6 @@ export function isJourneyComplete(entries: Entry[]): boolean {
   return completedSteps(entries) >= JOURNEY_STEPS
 }
 
-export function usedCards(entries: Entry[]): Set<string> {
-  return new Set(entries.flatMap((e) => (e.cardId ? [e.cardId] : [])))
+export function answeredStatements(entries: Entry[]): Set<string> {
+  return new Set(entries.flatMap((e) => (e.statementId ? [e.statementId] : [])))
 }

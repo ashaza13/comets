@@ -31,7 +31,7 @@ export const ObserveResponseSchema = z.object({
   next_prompt: z.string().nullable(),
 })
 
-export const EntryKindSchema = z.enum(['mood', 'card', 'topics', 'text'])
+export const EntryKindSchema = z.enum(['mood', 'statement', 'topics', 'text'])
 
 export const EntrySchema = z.object({
   id: z.string(),
@@ -42,7 +42,7 @@ export const EntrySchema = z.object({
   state: CometStateSchema,
   /** Journey step this answered; 'text' is optional free writing ("say more"). */
   kind: EntryKindSchema,
-  cardId: z.string().optional(),
+  statementId: z.string().optional(),
 })
 
 export type CometState = z.infer<typeof CometStateSchema>

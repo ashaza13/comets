@@ -2,7 +2,7 @@ import type { Axis } from './spec'
 
 // Plain-language readings, used instead of raw numbers outside chart mode.
 
-/** "leaning introvert", "strongly creative", "balanced" … */
+/** "leaning introvert", "strongly imaginative", "balanced" … */
 export function describeAxis(axis: Axis, value: number): string {
   const pole = value >= 0 ? axis.positive : axis.negative
   const magnitude = Math.abs(value)
@@ -14,7 +14,7 @@ export function describeAxis(axis: Axis, value: number): string {
 
 /** Hedge for an axis whose estimate is still loose (uncertainty is a variance, 0–1). */
 export function certaintyNote(uncertainty: number): string | null {
-  // A few cards on an axis bring the spread below ~0.6, so the hedge fades once
+  // A few answers on an axis bring the spread below ~0.6, so the hedge fades once
   // there is a real basis for the reading.
   const sd = Math.sqrt(uncertainty)
   if (sd > 0.85) return 'no read yet'

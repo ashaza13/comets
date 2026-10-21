@@ -1,12 +1,20 @@
-import { nextCard, type Card } from '../../lib/cards'
-import { JOURNEY_STEPS, cardObservation, completedSteps, moodObservation, stepKind, topicsObservation, usedCards } from '../../lib/journey'
+import {
+  DEPTH_LEVELS,
+  JOURNEY_STEPS,
+  answeredStatements,
+  completedSteps,
+  moodObservation,
+  statementObservation,
+  stepKind,
+  topicsObservation,
+} from '../../lib/journey'
 import { describeEmotion } from '../../lib/describe'
-import { DEPTH_LEVELS } from '../../lib/journey'
-import { INITIAL_STATE, type Entry } from '../../lib/schema'
+import { RESPONSES, nextStatement, statementText } from '../../lib/statements'
+import type { Entry } from '../../lib/schema'
 import { useCometStore } from '../../store'
-import { ChoiceCard } from './ChoiceCard'
 import { MoodWheel } from './MoodWheel'
 import { SayMore } from './SayMore'
+import { StatementRating } from './StatementRating'
 import { TopicPicker } from './TopicPicker'
 
 const MOOD_PROMPT = 'How are you, right now?'
@@ -18,7 +26,7 @@ interface Props {
   error: string | null
 }
 
-/** The guided journey: a mood check, a run of this-or-that cards, then interests. */
+/** The guided journey: a mood check, the personality statements, then interests. */
 export function JourneyPanel({ entries, isLoading, error }: Props) {
   const answer = useCometStore((s) => s.answer)
   const send = useCometStore((s) => s.send)
@@ -27,9 +35,8 @@ export function JourneyPanel({ entries, isLoading, error }: Props) {
   const kind = stepKind(done)
   if (!kind) return null
 
-  const uncertainty = entries.at(-1)?.state.uncertainty ?? INITIAL_STATE.uncertainty
-  const card: Card | null = kind === 'card' ? nextCard(usedCards(entries), uncertainty) : null
-  const prompt = kind === 'mood' ? MOOD_PROMPT : kind === 'topics' ? TOPICS_PROMPT : (card?.prompt ?? '')
+  const statement = kind === 'statement' ? nextStatement(answeredStatements(entries)) : null
+  const prompt = kind === 'mood' ? MOOD_PROMPT : kind === 'topics' ? TOPICS_PROMPT : statement ? statementText(statement) : ''
 
   return (
     <div className="journey" role="region" aria-label="Journey">
@@ -39,6 +46,7 @@ export function JourneyPanel({ entries, isLoading, error }: Props) {
         ))}
       </div>
 
+      {kind === 'statement' && <div className="journey-hint">How well does this describe you, as you generally are?</div>}
       <h2 className="journey-prompt">{prompt}</h2>
 
       {kind === 'mood' && (
@@ -54,21 +62,16 @@ export function JourneyPanel({ entries, isLoading, error }: Props) {
         />
       )}
 
-      {kind === 'card' && card && (
-        <ChoiceCard
-          key={card.id}
-          card={card}
-          onChoose={(option) =>
-            answer({ kind: 'card', observation: cardObservation(card, option), text: `Chose “${option.label}”`, prompt, cardId: card.id })
-          }
-          onSkip={() =>
+      {kind === 'statement' && statement && (
+        <StatementRating
+          key={statement.id}
+          onRate={(response) =>
             answer({
-              kind: 'card',
-              // A skipped card still counts as a step but tells us nothing.
-              observation: { ...cardObservation(card, card.a), personality: { x: null, y: null, z: null }, confidence: 0, reasoning: 'Skipped.' },
-              text: 'Skipped',
+              kind: 'statement',
+              observation: statementObservation(statement, response),
+              text: response === null ? 'Skipped' : RESPONSES[response - 1],
               prompt,
-              cardId: card.id,
+              statementId: statement.id,
             })
           }
         />
@@ -93,6 +96,11 @@ export function JourneyPanel({ entries, isLoading, error }: Props) {
 
       <SayMore key={prompt} prompt={prompt} isLoading={isLoading} onSend={send} />
       {error && <div className="journey-error">{error}</div>}
+      {kind === 'statement' && (
+        <div className="journey-credit">
+          Statements from the <a href="https://ipip.ori.org" target="_blank" rel="noreferrer">International Personality Item Pool</a> (public domain)
+        </div>
+      )}
     </div>
   )
 }

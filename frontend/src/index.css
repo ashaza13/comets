@@ -924,33 +924,56 @@ body {
 
 .mood-reading { font-size: 12px; color: #d0d0f8; min-height: 1.5em; }
 
-/* This-or-that */
+/* Statements (five-point rating) */
 
-.choice { display: flex; flex-direction: column; align-items: center; gap: 10px; width: 100%; }
+.rating { display: flex; flex-direction: column; align-items: center; gap: 10px; width: 100%; }
 
-.choice-options {
+.rating-options {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
   width: 100%;
 }
 
-.choice-option {
-  min-height: 84px;
-  padding: 14px;
+.rating-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  min-height: 76px;
+  padding: 10px 4px;
   border-radius: 12px;
   border: 1px solid #2a2a48;
   background: rgba(30, 30, 56, 0.6);
   color: #e4e4fa;
   font-family: var(--mono);
-  font-size: 13px;
-  line-height: 1.4;
+  font-size: 10.5px;
+  line-height: 1.3;
   cursor: pointer;
   transition: border-color 0.15s, background 0.15s, transform 0.1s;
 }
 
-.choice-option:hover { border-color: var(--accent); background: rgba(70, 70, 140, 0.35); }
-.choice-option:active { transform: scale(0.98); }
+.rating-option:hover { border-color: var(--accent); background: rgba(70, 70, 140, 0.35); }
+.rating-option:active { transform: scale(0.97); }
+
+/* A dot that grows from "very inaccurate" to "very accurate". */
+.rating-dot { width: 18px; height: 18px; display: grid; place-items: center; flex: none; }
+.rating-mark { border-radius: 50%; background: var(--accent); flex: none; }
+.rating-option--1 .rating-mark { width: 6px; height: 6px; opacity: 0.35; }
+.rating-option--2 .rating-mark { width: 9px; height: 9px; opacity: 0.5; }
+.rating-option--3 .rating-mark { width: 12px; height: 12px; opacity: 0.65; }
+.rating-option--4 .rating-mark { width: 15px; height: 15px; opacity: 0.8; }
+.rating-option--5 .rating-mark { width: 18px; height: 18px; opacity: 1; }
+
+@media (max-width: 520px) {
+  .rating-options { grid-template-columns: 1fr; }
+  .rating-option { flex-direction: row; min-height: 0; padding: 10px 14px; gap: 12px; font-size: 12px; }
+}
+
+.journey-hint { font-size: 11px; color: #9a9ac8; text-align: center; }
+
+.journey-credit { font-size: 9.5px; color: #6e6e98; text-align: center; }
+.journey-credit a { color: inherit; }
 
 /* Topics */
 

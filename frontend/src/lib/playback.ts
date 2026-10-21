@@ -59,7 +59,7 @@ const SAME_PLACE = 1e-3
 
 /**
  * The journey as one smooth curve through the origin and every distinct
- * position. Answers that didn't move the comet (mood, topics, skipped cards)
+ * position. Answers that didn't move the comet (mood, topics, skipped statements)
  * share their predecessor's place: repeating a point would make the curve
  * stall and jerk there. `knots[i]` is the curve parameter t of control point i
  * (0 = origin, i = after answer i), so the playhead can be mapped both ways.

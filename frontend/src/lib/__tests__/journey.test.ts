@@ -1,52 +1,76 @@
 import { describe, expect, it } from 'vitest'
-import { CARDS, cardInformation, nextCard } from '../cards'
 import { describeAxis, describeEmotion, feelingName } from '../describe'
-import { CARD_STEPS, JOURNEY_STEPS, cardObservation, stepKind, topicsObservation } from '../journey'
+import { applyObservation } from '../estimate'
+import { JOURNEY_STEPS, STATEMENT_STEPS, answeredStatements, statementObservation, stepKind, topicsObservation } from '../journey'
+import { INITIAL_STATE, type Entry } from '../schema'
 import { AXES, DOMAIN_BY_ID } from '../spec'
+import { STATEMENTS, nextStatement, statementReading, statementText } from '../statements'
 
-describe('card bank', () => {
-  it('has unique ids, distinct options and in-range loadings', () => {
-    expect(new Set(CARDS.map((c) => c.id)).size).toBe(CARDS.length)
-    for (const card of CARDS) {
-      expect(card.a.label).not.toBe(card.b.label)
-      for (const v of [...Object.values(card.a.loadings), ...Object.values(card.b.loadings)]) {
-        expect(Math.abs(v)).toBeLessThanOrEqual(1)
-      }
-      // Every card must separate its options on at least one axis.
-      expect(cardInformation(card, { x: 1, y: 1, z: 1 })).toBeGreaterThan(0.5)
+describe('statement bank', () => {
+  it('has unique ids and four statements per axis, two keyed each way', () => {
+    expect(new Set(STATEMENTS.map((s) => s.id)).size).toBe(STATEMENTS.length)
+    for (const axis of ['x', 'y', 'z'] as const) {
+      const items = STATEMENTS.filter((s) => s.axis === axis)
+      expect(items).toHaveLength(4)
+      expect(items.filter((s) => s.key === 1)).toHaveLength(2)
     }
   })
 
-  it('has enough cards on every axis for a journey', () => {
-    for (const axis of ['x', 'y', 'z'] as const) {
-      expect(CARDS.filter((c) => Math.abs((c.a.loadings[axis] ?? 0) - (c.b.loadings[axis] ?? 0)) >= 0.8).length).toBeGreaterThanOrEqual(CARD_STEPS / 2)
-    }
+  it('shows each item in the first person', () => {
+    expect(statementText(STATEMENTS[0])).toBe('I am the life of the party.')
+  })
+
+  it('never puts two statements for the same axis side by side', () => {
+    for (let i = 1; i < STATEMENTS.length; i++) expect(STATEMENTS[i].axis).not.toBe(STATEMENTS[i - 1].axis)
   })
 })
 
-describe('nextCard', () => {
-  it('targets the axis we are least sure about and never repeats', () => {
-    const card = nextCard(new Set(), { x: 0.05, y: 0.05, z: 1 })!
-    expect(Math.abs(card.a.loadings.z ?? 0)).toBeGreaterThan(0)
-    expect(nextCard(new Set([card.id]), { x: 0.05, y: 0.05, z: 1 })!.id).not.toBe(card.id)
-    expect(nextCard(new Set(CARDS.map((c) => c.id)), { x: 1, y: 1, z: 1 })).toBeNull()
+describe('scoring', () => {
+  it('maps the five responses onto the axis, reversing negatively keyed items', () => {
+    const positive = STATEMENTS.find((s) => s.key === 1)!
+    const negative = STATEMENTS.find((s) => s.key === -1)!
+    expect([1, 2, 3, 4, 5].map((r) => statementReading(positive, r))).toEqual([-1, -0.5, 0, 0.5, 1])
+    expect(statementReading(negative, 5)).toBe(-1)
+  })
+
+  it('reads only the statement’s own axis, and nothing when skipped', () => {
+    const s = STATEMENTS.find((st) => st.id === 'art')!
+    expect(statementObservation(s, 5).personality).toEqual({ x: null, y: null, z: 1 })
+    expect(statementObservation(s, 5).reasoning).toContain('very accurate')
+    const skipped = statementObservation(s, null)
+    expect(skipped.personality).toEqual({ x: null, y: null, z: null })
+    expect(skipped.confidence).toBe(0)
+  })
+
+  it('agreeing with every statement leaves the comet near the centre', () => {
+    let state = INITIAL_STATE
+    for (const s of STATEMENTS) state = applyObservation(state, statementObservation(s, 5))
+    for (const axis of ['x', 'y', 'z'] as const) expect(Math.abs(state.personality[axis])).toBeLessThan(0.35)
+  })
+
+  it('a consistent extravert lands far out on x with a firm estimate', () => {
+    let state = INITIAL_STATE
+    for (const s of STATEMENTS.filter((st) => st.axis === 'x')) state = applyObservation(state, statementObservation(s, s.key === 1 ? 5 : 1))
+    expect(state.personality.x).toBeGreaterThan(0.8)
+    expect(Math.sqrt(state.uncertainty.x)).toBeLessThan(0.45)
   })
 })
 
 describe('journey steps', () => {
-  it('runs mood, cards, then topics', () => {
+  it('runs mood, statements, then topics', () => {
     expect(stepKind(0)).toBe('mood')
-    expect(stepKind(1)).toBe('card')
-    expect(stepKind(CARD_STEPS)).toBe('card')
-    expect(stepKind(CARD_STEPS + 1)).toBe('topics')
+    expect(stepKind(1)).toBe('statement')
+    expect(stepKind(STATEMENT_STEPS)).toBe('statement')
+    expect(stepKind(STATEMENT_STEPS + 1)).toBe('topics')
     expect(stepKind(JOURNEY_STEPS)).toBeNull()
   })
 
-  it('turns a card choice into readings on only the axes it speaks to', () => {
-    const card = CARDS.find((c) => c.id === 'toy')!
-    const obs = cardObservation(card, card.b)
-    expect(obs.personality).toEqual({ x: null, y: null, z: 0.7 })
-    expect(obs.reasoning).toContain('A box of paints')
+  it('asks each statement once, in order', () => {
+    const first = nextStatement(new Set())!
+    expect(first.id).toBe(STATEMENTS[0].id)
+    const entries = [{ statementId: first.id } as Entry]
+    expect(nextStatement(answeredStatements(entries))!.id).toBe(STATEMENTS[1].id)
+    expect(nextStatement(new Set(STATEMENTS.map((s) => s.id)))).toBeNull()
   })
 
   it('reports picked topics with their depth', () => {

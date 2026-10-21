@@ -11,7 +11,7 @@ interface Answer {
   /** What was chosen, in words, for the log and memory cards. */
   text: string
   prompt: string
-  cardId?: string
+  statementId?: string
 }
 
 interface CometStore {
@@ -46,12 +46,12 @@ export const useCometStore = create<CometStore>()(
       chartMode: false,
       toggleChartMode: () => set((s) => ({ chartMode: !s.chartMode })),
 
-      answer: ({ kind, observation, text, prompt, cardId }) => {
+      answer: ({ kind, observation, text, prompt, statementId }) => {
         set((s) => {
           const latest = s.entries.at(-1)?.state ?? INITIAL_STATE
           const state = applyObservation(latest, observation)
           return {
-            entries: [...s.entries, { id: crypto.randomUUID(), kind, text, prompt, cardId, observation, state }],
+            entries: [...s.entries, { id: crypto.randomUUID(), kind, text, prompt, statementId, observation, state }],
             error: null,
           }
         })
@@ -81,8 +81,9 @@ export const useCometStore = create<CometStore>()(
     }),
     {
       name: 'comets:v1',
-      // v2: tap-based journey. Text-only journeys from v1 don't fit it, so start fresh.
-      version: 2,
+      // v2: tap-based journey (v1 was text only). v3: research-based statements
+      // replaced the this-or-that cards. Older journeys don't fit, so start fresh.
+      version: 3,
       migrate: () => ({ entries: [], chartMode: false }),
       storage: createJSONStorage(() => localStorage),
       partialize: (s) => ({ entries: s.entries, chartMode: s.chartMode }),
