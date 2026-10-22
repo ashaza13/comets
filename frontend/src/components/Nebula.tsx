@@ -7,6 +7,7 @@ import bakeVertex from '../shaders/nebula.vert'
 import displayFragment from '../shaders/nebulaDisplay.frag'
 import displayVertex from '../shaders/nebulaDisplay.vert'
 import { BAND_NORMAL } from '../lib/sky'
+import type { Warp } from '../lib/warp'
 import { useReducedMotion } from '../hooks/useReducedMotion'
 
 const CUBE_SIZE = 512
@@ -26,7 +27,7 @@ interface Bake {
  * of structure layers; a cheap per-frame shader colours it, tints it with the
  * person's average mood and slowly rotates it.
  */
-export function Nebula({ tint, intensity = 1 }: { tint: THREE.Color; intensity?: number }) {
+export function Nebula({ tint, intensity = 1, warp }: { tint: THREE.Color; intensity?: number; warp?: Warp }) {
   const mesh = useRef<THREE.Mesh>(null)
   const material = useRef<THREE.ShaderMaterial>(null)
   const bake = useRef<Bake | null>(null)
@@ -34,6 +35,7 @@ export function Nebula({ tint, intensity = 1 }: { tint: THREE.Color; intensity?:
   const reducedMotion = useReducedMotion()
   const axis = useMemo(() => BAND_NORMAL.clone(), [])
   const rotation = useMemo(() => new THREE.Matrix4(), [])
+  const skyTurn = useMemo(() => new THREE.Matrix4(), [])
 
   const uniforms = useMemo(
     () => ({
@@ -89,9 +91,13 @@ export function Nebula({ tint, intensity = 1 }: { tint: THREE.Color; intensity?:
     // Centred on the camera so the backdrop behaves as if infinitely far away.
     mesh.current.position.copy(camera.position)
     easing.dampC(m.uniforms.uTint.value, tint, 1.5, delta)
-    m.uniforms.uIntensity.value = intensity
+    // Hyperspace washes the backdrop out while the streaks take over.
+    m.uniforms.uIntensity.value = intensity * (1 - 0.6 * (warp?.level ?? 0))
     const angle = reducedMotion ? 0 : clock.getElapsedTime() * DRIFT_RADIANS_PER_SECOND
-    m.uniforms.uRotation.value.setFromMatrix4(rotation.makeRotationAxis(axis, angle))
+    rotation.makeRotationAxis(axis, angle)
+    // Each jump arrives in a new region of sky.
+    if (warp) rotation.premultiply(skyTurn.makeRotationFromQuaternion(warp.sky))
+    m.uniforms.uRotation.value.setFromMatrix4(rotation)
   })
 
   return (

@@ -4,14 +4,16 @@ import * as THREE from 'three'
 import fragmentShader from '../shaders/stars.frag'
 import vertexShader from '../shaders/stars.vert'
 import { generateStars } from '../lib/sky'
+import type { Warp } from '../lib/warp'
 import { useReducedMotion } from '../hooks/useReducedMotion'
 
 /**
  * Twinkling stars at a range of depths (so they parallax as the camera moves),
  * coloured by temperature and concentrated along the galactic band.
  */
-export function Starfield({ count = 9000 }: { count?: number }) {
+export function Starfield({ count = 9000, warp }: { count?: number; warp?: Warp }) {
   const material = useRef<THREE.ShaderMaterial>(null)
+  const points = useRef<THREE.Points>(null)
   const pixelRatio = useThree((s) => s.viewport.dpr)
   const reducedMotion = useReducedMotion()
 
@@ -33,10 +35,13 @@ export function Starfield({ count = 9000 }: { count?: number }) {
     m.uniforms.uTime.value = clock.getElapsedTime()
     m.uniforms.uTwinkle.value = reducedMotion ? 0 : 0.55
     m.uniforms.uPixelRatio.value = pixelRatio
+    // In hyperspace the stars give way to the streaks, and come back in a new region of sky.
+    m.uniforms.uBrightness.value = 1.7 * (1 - 0.85 * (warp?.level ?? 0))
+    if (warp && points.current) points.current.quaternion.copy(warp.sky)
   })
 
   return (
-    <points frustumCulled={false}>
+    <points ref={points} frustumCulled={false}>
       <bufferGeometry>
         <bufferAttribute attach="attributes-position" args={[stars.positions, 3]} />
         <bufferAttribute attach="attributes-aColor" args={[stars.colors, 3]} />

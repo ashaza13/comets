@@ -3,6 +3,7 @@ import { OrbitControls } from '@react-three/drei'
 import { useFrame } from '@react-three/fiber'
 import { easing } from 'maath'
 import * as THREE from 'three'
+import type { Warp } from '../lib/warp'
 import { useReducedMotion } from '../hooks/useReducedMotion'
 import { clearCentre, freeAreaCentre } from '../lib/framing'
 
@@ -44,6 +45,8 @@ interface Props {
   flyIn?: boolean
   /** Bounding sphere of the journey, framed in map mode. */
   mapFrame?: THREE.Sphere
+  /** Hyperspace jumps widen the view sharply. */
+  warp?: Warp
 }
 
 // Overlays that cover part of the canvas; the comet is framed in the space they leave.
@@ -57,8 +60,10 @@ const FLY_IN_SECONDS = 6
 const BASE_FOV = 50
 // Extra field of view at full speed, for a sense of acceleration.
 const WARP_FOV = 14
+// Extra field of view at full hyperspace: the lurch of the jump.
+const JUMP_FOV = 26
 
-export function CameraRig({ mode, head, flyIn = false, mapFrame }: Props) {
+export function CameraRig({ mode, head, flyIn = false, mapFrame, warp }: Props) {
   const controls = useRef<Controls>(null)
   // endedAt is null until the frame loop stamps it with the clock's time.
   const interaction = useRef<{ active: boolean; endedAt: number | null }>({ active: false, endedAt: -Infinity })
@@ -97,7 +102,9 @@ export function CameraRig({ mode, head, flyIn = false, mapFrame }: Props) {
     if (head.current) goal.copy(head.current.position)
     else goal.copy(ORIGIN)
     before.copy(c.target)
-    easing.damp3(c.target, goal, FOLLOW[mode], delta)
+    // In hyperspace the camera locks onto the comet, keeping it at the tunnel's heart.
+    const follow = THREE.MathUtils.lerp(FOLLOW[mode], 0.08, mode === 'journey' ? (warp?.level ?? 0) : 0)
+    easing.damp3(c.target, goal, follow, delta)
     camera.position.add(offset.subVectors(c.target, before))
 
     // Ease to the mode's framing distance, unless the user takes over.
@@ -124,7 +131,8 @@ export function CameraRig({ mode, head, flyIn = false, mapFrame }: Props) {
       easing.damp(m, 'speed', speed, 0.4, delta)
     }
     const perspective = camera as THREE.PerspectiveCamera
-    const fov = (mode === 'journey' || mode === 'replay') && !reducedMotion ? BASE_FOV + WARP_FOV * THREE.MathUtils.smoothstep(m.speed, 0.5, 8) : BASE_FOV
+    const moving = (mode === 'journey' || mode === 'replay') && !reducedMotion
+    const fov = moving ? BASE_FOV + WARP_FOV * THREE.MathUtils.smoothstep(m.speed, 0.5, 8) + JUMP_FOV * (warp?.level ?? 0) : BASE_FOV
     if (Math.abs(perspective.fov - fov) > 0.01) {
       easing.damp(perspective, 'fov', fov, 0.5, delta)
       perspective.updateProjectionMatrix()

@@ -9,6 +9,7 @@ import { Comet, type CometHandle } from './Comet'
 import { Constellations } from './Constellations'
 import { FinalMarker } from './FinalMarker'
 import { FriendStars } from './FriendStars'
+import { Hyperspace } from './Hyperspace'
 import { Flare } from './Flare'
 import { MemoryStars } from './MemoryStars'
 import { Nebula } from './Nebula'
@@ -16,11 +17,13 @@ import { ResultCard } from './ResultCard'
 import { SpaceDust } from './SpaceDust'
 import { Starfield } from './Starfield'
 import { Tail } from './Tail'
+import { WarpDrive, WarpFlash } from './WarpDrive'
 import { Timeline } from './Timeline'
 import { useConstellation } from '../groupStore'
 import { emotionColor } from '../lib/emotionColor'
 import { journeyBounds, toWorld } from '../lib/tail'
 import { createNanGuardPass } from '../lib/nanGuard'
+import { createWarp } from '../lib/warp'
 import { easeReplay, historyAt, journeyPath, playheadToT, tToPlayhead } from '../lib/playback'
 import { INITIAL_STATE, type CometState, type Entry } from '../lib/schema'
 
@@ -76,6 +79,8 @@ export function Scene({ entries, debugState, isLoading, chartMode, revealed, sho
   )
   // How far along the path the comet is: written by the comet, read by the tail.
   const progress = useMemo(() => ({ t: 0 }), [])
+  // Hyperspace jumps: fired by WarpDrive, felt by the sky, dust, tunnel and camera.
+  const warp = useMemo(() => createWarp(), [])
   const finalState = fullHistory.at(-1)
   const finalPosition = useMemo(() => (finalState ? toWorld(finalState.personality) : null), [finalState])
 
@@ -157,9 +162,10 @@ export function Scene({ entries, debugState, isLoading, chartMode, revealed, sho
     <>
       <Canvas camera={{ position: [4.6, 2.4, 6.4], fov: 50, far: 2000 }} gl={{ antialias: true }} style={{ background: '#04040a' }}>
         <AdaptiveDpr pixelated={false} />
-        <Nebula tint={tint} />
-        <Starfield />
-        <SpaceDust />
+        <Nebula tint={tint} warp={warp} />
+        <Starfield warp={warp} />
+        <SpaceDust warp={warp} />
+        <Hyperspace warp={warp} />
         <Constellations chartMode={chartMode} revealed={mapShown} />
         <Tail history={history} head={head} look={look} path={debugState ? null : path} progress={progress} />
         <FriendStars friends={friends} visible={mapShown && !debugState} />
@@ -179,7 +185,13 @@ export function Scene({ entries, debugState, isLoading, chartMode, revealed, sho
         <Flare count={total} head={head} look={look} />
         {finalPosition && <FinalMarker position={finalPosition} shown={showResult && playhead === null} />}
 
-        <CameraRig mode={cameraMode} head={head} flyIn={flyIn} mapFrame={mapFrame} />
+        <WarpDrive
+          warp={warp}
+          legs={debugState ? 0 : (path?.points.length ?? 0)}
+          active={cameraMode === 'journey' && !debugState}
+          head={head}
+        />
+        <CameraRig mode={cameraMode} head={head} flyIn={flyIn} mapFrame={mapFrame} warp={warp} />
 
         <EffectComposer multisampling={4}>
           {/* Must run before bloom, which would otherwise smear one bad pixel over the frame. */}
@@ -190,6 +202,7 @@ export function Scene({ entries, debugState, isLoading, chartMode, revealed, sho
           <ToneMapping mode={ToneMappingMode.AGX} />
         </EffectComposer>
       </Canvas>
+      <WarpFlash warp={warp} />
 
       {showControls && revealed && total > 0 && !debugState && (
         <Timeline

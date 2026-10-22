@@ -157,7 +157,10 @@ While you answer, the camera travels with the comet and the axes stay hidden; ea
 flare and the comet sets off for its new position, leaving a memory star behind. It doesn't go in a
 straight line: each move takes a winding route through one or two random detours (seeded by the
 answer, so replays retrace it exactly), flown at a random cruising speed with a slow drift, and an
-answer mid-flight carries straight on into the next leg. After the last step
+answer mid-flight carries straight on into the next leg. Each move is also a hyperspace jump:
+stars stretch into a tunnel of streaks radiating from the comet, a blue-white flash fires, the view
+lurches wider, and the whole sky swings round to a new region while it's hidden, so every answer
+arrives somewhere new (reduced motion keeps the new sky, without the tunnel or flash). After the last step
 the journey replays from the start with the camera riding along, then it pulls back to the comet's
 final place and the axes fade in around it. Dashed lines drop from the comet to each axis, and a
 "where you landed" card reads out each dimension on a scale, with a band for how sure the estimate

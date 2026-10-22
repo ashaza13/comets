@@ -5,6 +5,7 @@ import * as THREE from 'three'
 import fragmentShader from '../shaders/warp.frag'
 import vertexShader from '../shaders/warp.vert'
 import { mulberry32 } from '../lib/sky'
+import type { Warp } from '../lib/warp'
 import { useReducedMotion } from '../hooks/useReducedMotion'
 
 const COUNT = 1800
@@ -18,7 +19,7 @@ const MAX_STREAK = 9
  * gives depth; while travelling the motes stretch into streaks along the
  * direction of motion, so moving through the cosmos is felt, not just seen.
  */
-export function SpaceDust() {
+export function SpaceDust({ warp }: { warp?: Warp }) {
   const points = useRef<THREE.ShaderMaterial>(null)
   const lines = useRef<THREE.ShaderMaterial>(null)
   const pixelRatio = useThree((s) => s.viewport.dpr)
@@ -92,9 +93,12 @@ export function SpaceDust() {
       else mat.uniforms.uVelocity.value.set(0, 0, 0)
     }
     // Streaks fade in with speed; motes dim slightly so the streaks dominate.
-    const warp = THREE.MathUtils.smoothstep(speed, 0.5, 4)
-    l.uniforms.uOpacity.value = reducedMotion ? 0 : 0.85 * warp
-    p.uniforms.uOpacity.value = 0.55 * (1 - 0.4 * warp)
+    const streaking = THREE.MathUtils.smoothstep(speed, 0.5, 4)
+    // In hyperspace the dust gives way to the tunnel: its streaks run along the
+    // comet's path, which would criss-cross the tunnel's radiating lines.
+    const hyperspace = warp?.level ?? 0
+    l.uniforms.uOpacity.value = reducedMotion ? 0 : 0.85 * streaking * (1 - hyperspace)
+    p.uniforms.uOpacity.value = 0.55 * (1 - 0.4 * streaking) * (1 - 0.8 * hyperspace)
   })
 
   const additive = { transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false }
