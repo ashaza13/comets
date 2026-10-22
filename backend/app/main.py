@@ -1,10 +1,23 @@
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Path, Response
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.comet import apply_observation
 from app.config import get_settings
+from app.groups import (
+    Group,
+    GroupFull,
+    GroupStore,
+    Member,
+    MemberIn,
+    MemoryStore,
+    UpstashStore,
+    new_group_id,
+    public_id,
+    sort_members,
+    to_member,
+)
 from app.signals.extractor import ClaudeExtractor, ExtractionError, Extractor
 from app.signals.models import CometState, ObserveRequest, ObserveResponse
 from app.spec import next_prompt
@@ -51,3 +64,77 @@ def observe(body: ObserveRequest, extract: Annotated[Extractor, Depends(get_extr
 
     state = apply_observation(body.state or CometState(), observation)
     return ObserveResponse(observation=observation, state=state, next_prompt=next_prompt(state.message_count))
+
+
+# ── Constellations: compare with friends through a shared link ─────────────────
+
+_store: GroupStore | None = None
+
+
+def get_store() -> GroupStore | None:
+    # None when no Redis is configured: sharing is then switched off rather than
+    # silently kept in memory, which serverless instances would lose.
+    global _store
+    if _store is None:
+        if settings.redis_rest:
+            _store = UpstashStore(*settings.redis_rest)
+        elif settings.groups_in_memory:
+            _store = MemoryStore()
+    return _store
+
+
+Store = Annotated[GroupStore | None, Depends(get_store)]
+GroupId = Annotated[str, Path(pattern=r"^[A-Za-z0-9]{10}$")]
+MemberSecret = Annotated[str, Path(pattern=r"^[A-Za-z0-9_-]{16,64}$")]
+
+
+def _require(store: GroupStore | None) -> GroupStore:
+    if store is None:
+        raise HTTPException(status_code=503, detail="Sharing isn't set up on this server.")
+    return store
+
+
+def _require_group(store: GroupStore, group_id: str) -> None:
+    if not store.exists(group_id):
+        raise HTTPException(status_code=404, detail="This constellation doesn't exist or has expired.")
+
+
+@app.get("/sharing")
+def sharing(store: Store):
+    return {"enabled": store is not None}
+
+
+@app.post("/groups", status_code=201)
+def create_group(store: Store):
+    s = _require(store)
+    for _ in range(5):
+        group_id = new_group_id()
+        if s.create(group_id):
+            return {"id": group_id}
+    raise HTTPException(status_code=503, detail="Couldn't create a constellation, try again.")
+
+
+@app.get("/groups/{group_id}", response_model=Group)
+def get_group(group_id: GroupId, store: Store):
+    s = _require(store)
+    _require_group(s, group_id)
+    return Group(id=group_id, members=sort_members(s.members(group_id)))
+
+
+@app.put("/groups/{group_id}/members/{secret}", response_model=Member)
+def join_group(group_id: GroupId, secret: MemberSecret, body: MemberIn, store: Store):
+    s = _require(store)
+    _require_group(s, group_id)
+    member = to_member(group_id, secret, body)
+    try:
+        s.upsert(group_id, member)
+    except GroupFull as e:
+        raise HTTPException(status_code=409, detail="This constellation is full.") from e
+    return member
+
+
+@app.delete("/groups/{group_id}/members/{secret}", status_code=204)
+def leave_group(group_id: GroupId, secret: MemberSecret, store: Store):
+    s = _require(store)
+    s.remove(group_id, public_id(group_id, secret))
+    return Response(status_code=204)

@@ -2,6 +2,8 @@ import { lazy, Suspense, useState, useCallback } from 'react'
 import { ChatPanel } from './components/ChatPanel'
 import { IntroFlow } from './components/IntroFlow'
 import { JourneyPanel } from './components/journey/JourneyPanel'
+import { useConstellation } from './groupStore'
+import { useConstellationSync } from './hooks/useConstellationSync'
 import { isJourneyComplete } from './lib/journey'
 import { useCometStore } from './store'
 
@@ -36,6 +38,9 @@ export default function App() {
   // The axes stay hidden until the journey is complete (always shown in ?debug).
   const complete = isJourneyComplete(entries)
   const revealed = DEBUG || complete
+  const finalState = entries.at(-1)?.state ?? null
+  useConstellationSync(finalState, complete)
+  const invited = useConstellation((s) => s.invite !== null && s.enabled === true)
 
   const leaveIntro = useCallback(() => {
     setIntroExiting(true)
@@ -107,7 +112,7 @@ export default function App() {
 
       {/* Intro overlay */}
       {phase === 'intro' && (
-        <IntroFlow exiting={introExiting} onDone={leaveIntro} />
+        <IntroFlow exiting={introExiting} onDone={leaveIntro} invited={invited} />
       )}
     </div>
   )

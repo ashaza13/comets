@@ -18,6 +18,21 @@ class Settings(BaseSettings):
     llm_max_tokens: int = 4096
     cors_origins: list[str] = ["*"]
 
+    # Constellations (shared groups) are stored in Upstash Redis. Vercel's
+    # Upstash integration sets the KV_* names; Upstash's own console uses UPSTASH_*.
+    kv_rest_api_url: str | None = None
+    kv_rest_api_token: str | None = None
+    upstash_redis_rest_url: str | None = None
+    upstash_redis_rest_token: str | None = None
+    # Local development only: keep groups in memory (lost on restart).
+    groups_in_memory: bool = False
+
+    @property
+    def redis_rest(self) -> tuple[str, str] | None:
+        url = self.kv_rest_api_url or self.upstash_redis_rest_url
+        token = self.kv_rest_api_token or self.upstash_redis_rest_token
+        return (url, token) if url and token else None
+
     @field_validator("llm_model")
     @classmethod
     def _strip_provider_prefix(cls, v: str) -> str:

@@ -165,6 +165,25 @@ language ("leaning introvert"); chart mode shows the exact numbers.
 Personality is estimated with a per-axis Kalman filter, so repeated readings converge on
 where the person sits instead of drifting to the edge of the space.
 
+### Comparing with friends (constellations)
+
+From the result card's **Friends** tab, enter a first name or nickname and **Create link** to start a
+constellation, then share the link (`/?c=<id>`). A friend who opens it sees an invitation, takes
+the journey, and joins with their own name. Everyone in the constellation then appears on each
+other's map as a named star, and the Friends tab lists them by how alike you are, with the
+interests you share. Joining a different link moves you to that constellation.
+
+Only a name and the final reading (position, certainty, mood and top five interests) are stored,
+never the answers. Each device writes its entry with a private secret; others see only a hash of
+it, salted per constellation. Constellations hold up to 50 people and expire 180 days after
+their last change.
+
+Storage is [Upstash Redis](https://vercel.com/marketplace/upstash) over its REST API. In the Vercel
+project, add it under **Storage → Create Database → Upstash for Redis** and connect it to the
+project; that sets `KV_REST_API_URL` and `KV_REST_API_TOKEN` (the `UPSTASH_REDIS_REST_*` names
+work too). Without them, sharing is switched off and the Friends tab is hidden. For local
+development, `GROUPS_IN_MEMORY=true` keeps constellations in memory instead.
+
 ---
 
 ## Running Locally
@@ -173,7 +192,7 @@ where the person sits instead of drifting to the edge of the space.
 # Backend (Python 3.12+)
 cd backend
 python -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
-cp .env.example .env            # add ANTHROPIC_API_KEY
+cp .env.example .env            # add ANTHROPIC_API_KEY (and GROUPS_IN_MEMORY=true to try sharing)
 .venv/bin/uvicorn app.main:app --reload --port 8000
 
 # Frontend
@@ -182,7 +201,7 @@ npm install
 npm run dev                     # http://localhost:5173, proxies /api to :8000
 ```
 
-Open `http://localhost:5173/?debug` for slider controls over every visual channel. The **◎ chart** button
+Open `http://localhost:5173/?debug` for slider controls over every visual channel. The **Chart view** button
 switches from the constellation view to crisp axes and rings for reading exact positions.
 
 ### Checks

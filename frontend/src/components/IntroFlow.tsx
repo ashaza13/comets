@@ -58,9 +58,11 @@ interface Props {
   exiting: boolean
   /** Leave the intro (Begin or skip). */
   onDone: () => void
+  /** Opened from a friend's constellation link. */
+  invited?: boolean
 }
 
-export function IntroFlow({ exiting, onDone }: Props) {
+export function IntroFlow({ exiting, onDone, invited = false }: Props) {
   const [slideIdx, setSlideIdx] = useState(0)
   const [contentVisible, setContentVisible] = useState(true)
   const slide = SLIDES[slideIdx]
@@ -107,6 +109,10 @@ export function IntroFlow({ exiting, onDone }: Props) {
           )}
 
           {slide.body && <p className="intro-body">{slide.body}</p>}
+
+          {invited && slideIdx === 0 && (
+            <p className="intro-invite">A friend shared their constellation. Take the journey, then see where you land beside them.</p>
+          )}
 
           {slide.axes && (
             <div className="intro-axes">

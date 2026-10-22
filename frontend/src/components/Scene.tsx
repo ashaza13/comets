@@ -8,6 +8,7 @@ import { CameraRig, type CameraMode } from './CameraRig'
 import { Comet, type CometHandle } from './Comet'
 import { Constellations } from './Constellations'
 import { FinalMarker } from './FinalMarker'
+import { FriendStars } from './FriendStars'
 import { Flare } from './Flare'
 import { MemoryStars } from './MemoryStars'
 import { Nebula } from './Nebula'
@@ -16,6 +17,7 @@ import { SpaceDust } from './SpaceDust'
 import { Starfield } from './Starfield'
 import { Tail } from './Tail'
 import { Timeline } from './Timeline'
+import { useConstellation } from '../groupStore'
 import { emotionColor } from '../lib/emotionColor'
 import { journeyBounds, toWorld } from '../lib/tail'
 import { createNanGuardPass } from '../lib/nanGuard'
@@ -62,7 +64,11 @@ export function Scene({ entries, debugState, isLoading, chartMode, revealed, sho
 
   const fullHistory = useMemo(() => entries.map((e) => e.state), [entries])
   const total = entries.length
-  const mapFrame = useMemo(() => journeyBounds(fullHistory), [fullHistory])
+  // Friends from a constellation you joined, or are invited to, appear on the map.
+  const members = useConstellation((s) => s.members)
+  const selfId = useConstellation((s) => s.membership?.memberId ?? null)
+  const friends = useMemo(() => members.filter((m) => m.id !== selfId), [members, selfId])
+  const mapFrame = useMemo(() => journeyBounds(fullHistory, friends.map((f) => f.personality)), [fullHistory, friends])
   const path = useMemo(() => journeyPath(fullHistory), [fullHistory])
   const finalState = fullHistory.at(-1)
   const finalPosition = useMemo(() => (finalState ? toWorld(finalState.personality) : null), [finalState])
@@ -151,6 +157,7 @@ export function Scene({ entries, debugState, isLoading, chartMode, revealed, sho
         <SpaceDust />
         <Constellations chartMode={chartMode} revealed={mapShown} />
         <Tail history={history} head={head} look={look} journey={path && replayT !== null ? { path, t: replayT } : null} />
+        <FriendStars friends={friends} visible={mapShown && !debugState} />
         <MemoryStars entries={memories} total={total} interactive={mapShown} onHoverChange={setMemoryOpen} />
         <Comet
           ref={comet}

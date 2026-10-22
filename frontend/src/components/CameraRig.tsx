@@ -60,7 +60,7 @@ export function CameraRig({ mode, head, flyIn = false, mapFrame }: Props) {
   const controls = useRef<Controls>(null)
   // endedAt is null until the frame loop stamps it with the clock's time.
   const interaction = useRef<{ active: boolean; endedAt: number | null }>({ active: false, endedAt: -Infinity })
-  const framing = useRef<{ mode: CameraMode | null; until: number }>({ mode: null, until: 0 })
+  const framing = useRef<{ mode: CameraMode | null; until: number; radius: number }>({ mode: null, until: 0, radius: 0 })
   const reducedMotion = useReducedMotion()
   const tmp = useMemo(() => ({ goal: new THREE.Vector3(), before: new THREE.Vector3(), offset: new THREE.Vector3() }), [])
   const motion = useRef({ last: new THREE.Vector3(), speed: 0, started: false })
@@ -75,10 +75,18 @@ export function CameraRig({ mode, head, flyIn = false, mapFrame }: Props) {
 
     // A new mode re-frames the shot. On first mount, either keep the initial
     // view or, for a fly-in, start far out and glide to the mode's distance.
+    // A returning visitor who lands straight on the map glides out to frame it too.
+    const radius = mapFrame?.radius ?? 0
     if (framing.current.mode !== mode) {
       const first = framing.current.mode === null
       if (first && flyIn && !reducedMotion) camera.position.multiplyScalar(FLY_IN_SCALE)
-      framing.current = { mode, until: first ? (flyIn ? now + FLY_IN_SECONDS : 0) : now + FRAMING_SECONDS }
+      const until = first ? (flyIn ? now + FLY_IN_SECONDS : mode === 'map' ? now + FRAMING_SECONDS : 0) : now + FRAMING_SECONDS
+      framing.current = { mode, until, radius }
+    } else if (mode === 'map' && Math.abs(radius - framing.current.radius) > framing.current.radius * 0.05 + 0.5) {
+      // The map grew or shrank (e.g. a friend joined far away): re-frame it,
+      // unless the user is in the middle of moving the camera.
+      framing.current.radius = radius
+      if (!active) framing.current.until = now + FRAMING_SECONDS
     }
 
     // Follow: move the orbit target to the comet and carry the camera along by

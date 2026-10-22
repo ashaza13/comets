@@ -1071,3 +1071,102 @@ button { font-family: inherit; }
   .result,
   .result-chip { animation: none; }
 }
+
+/* ── Constellations (compare with friends) ───────────────────────────────── */
+
+.result-tabs { display: flex; gap: 16px; }
+
+.result-tab {
+  background: none;
+  border: none;
+  border-bottom: 1px solid transparent;
+  padding: 0 0 4px;
+  color: var(--text-3);
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.result-tab[aria-selected='true'] { color: var(--text); border-bottom-color: var(--accent); }
+
+@media (hover: hover) {
+  .result-tab:hover { color: var(--text); }
+}
+
+.constellation { display: flex; flex-direction: column; gap: 12px; }
+
+.constellation-lead { font-size: 13px; line-height: 1.5; color: var(--text-2); }
+.constellation-note { font-size: 11.5px; color: var(--text-3); }
+.constellation-error { font-size: 12px; color: var(--danger); }
+
+.constellation-form { display: flex; gap: 8px; }
+
+.constellation-name,
+.share-url {
+  flex: 1;
+  min-width: 0;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 13px;
+  padding: 7px 10px;
+}
+
+.constellation-name::placeholder { color: var(--text-3); }
+.constellation-name:focus,
+.share-url:focus { outline: none; border-color: var(--line-strong); }
+
+.share { display: flex; gap: 6px; }
+.share-url { font-size: 12px; color: var(--text-2); text-overflow: ellipsis; }
+
+.share-btn {
+  flex: none;
+  background: none;
+  border: 1px solid var(--line-strong);
+  border-radius: 3px;
+  padding: 6px 11px;
+  color: var(--text);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+@media (hover: hover) {
+  .share-btn:hover { border-color: var(--accent); }
+}
+
+.friends { list-style: none; display: flex; flex-direction: column; }
+
+.friend { display: flex; flex-direction: column; gap: 2px; padding: 9px 0; border-top: 1px solid var(--line); }
+.friend:first-child { border-top: none; padding-top: 0; }
+
+.friend-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.friend-name { display: inline-flex; align-items: center; gap: 7px; font-weight: 600; color: var(--text); }
+.friend-alike { font-size: 12px; color: var(--accent); font-variant-numeric: tabular-nums; }
+.friend-reading { font-size: 12px; color: var(--text-2); }
+.friend-shared { font-size: 11.5px; color: var(--text-3); }
+
+.constellation-leave { align-self: flex-start; padding-left: 0; font-size: 11.5px; }
+
+/* Names beside friends' stars on the map. */
+.friend-label {
+  transform: translate(calc(50% + 12px), 0);
+  white-space: nowrap;
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  text-shadow: 0 0 6px rgba(0, 0, 0, 0.9);
+}
+
+.intro-invite {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--accent);
+  max-width: 30em;
+}
+
+@media (pointer: coarse) {
+  .constellation-name { font-size: 16px; }
+}
