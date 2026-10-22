@@ -180,8 +180,8 @@ their last change.
 
 Storage is [Upstash Redis](https://vercel.com/marketplace/upstash) over its REST API. In the Vercel
 project, add it under **Storage → Create Database → Upstash for Redis** and connect it to the
-project; that sets `KV_REST_API_URL` and `KV_REST_API_TOKEN` (the `UPSTASH_REDIS_REST_*` names
-work too). Without them, sharing is switched off and the Friends tab is hidden. For local
+project; that sets `KV_REST_API_URL` and `KV_REST_API_TOKEN`, with any custom prefix chosen
+when connecting (e.g. `STORAGE_KV_REST_API_URL`). The `UPSTASH_REDIS_REST_*` names work too. Without them, sharing is switched off and the Friends tab is hidden. For local
 development, `GROUPS_IN_MEMORY=true` keeps constellations in memory instead.
 
 ---

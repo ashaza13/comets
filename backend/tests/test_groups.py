@@ -152,3 +152,17 @@ def test_upstash_store_round_trip():
     assert store.members("abcdefghij") == []
     # The group outlives its last member, so the link keeps working.
     assert store.exists("abcdefghij")
+
+
+def test_redis_credentials_with_a_custom_prefix():
+    from app.config import prefixed_kv_rest
+
+    env = {
+        "STORAGE_KV_REST_API_URL": "https://x.upstash.io",
+        "STORAGE_KV_REST_API_READ_ONLY_TOKEN": "read-only",
+        "STORAGE_KV_REST_API_TOKEN": "read-write",
+        "OTHER": "1",
+    }
+    assert prefixed_kv_rest(env) == ("https://x.upstash.io", "read-write")
+    assert prefixed_kv_rest({"STORAGE_KV_REST_API_URL": "https://x.upstash.io"}) is None
+    assert prefixed_kv_rest({}) is None

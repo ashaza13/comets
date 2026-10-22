@@ -1,3 +1,5 @@
+import os
+from collections.abc import Mapping
 from functools import lru_cache
 
 from pydantic import field_validator
@@ -19,7 +21,8 @@ class Settings(BaseSettings):
     cors_origins: list[str] = ["*"]
 
     # Constellations (shared groups) are stored in Upstash Redis. Vercel's
-    # Upstash integration sets the KV_* names; Upstash's own console uses UPSTASH_*.
+    # Upstash integration sets the KV_* names, with any custom prefix the store was
+    # connected with (e.g. STORAGE_KV_REST_API_URL); Upstash's own console uses UPSTASH_*.
     kv_rest_api_url: str | None = None
     kv_rest_api_token: str | None = None
     upstash_redis_rest_url: str | None = None
@@ -31,13 +34,26 @@ class Settings(BaseSettings):
     def redis_rest(self) -> tuple[str, str] | None:
         url = self.kv_rest_api_url or self.upstash_redis_rest_url
         token = self.kv_rest_api_token or self.upstash_redis_rest_token
-        return (url, token) if url and token else None
+        if url and token:
+            return url, token
+        return prefixed_kv_rest(os.environ)
 
     @field_validator("llm_model")
     @classmethod
     def _strip_provider_prefix(cls, v: str) -> str:
         # Accept LiteLLM-style ids ("anthropic/claude-…") left over from the old provider layer.
         return v.removeprefix("anthropic/")
+
+
+def prefixed_kv_rest(env: Mapping[str, str]) -> tuple[str, str] | None:
+    """The REST URL and read-write token from a prefixed Vercel KV pair, e.g.
+    STORAGE_KV_REST_API_URL with STORAGE_KV_REST_API_TOKEN (never the read-only token)."""
+    for key, url in sorted(env.items()):
+        if key.endswith("KV_REST_API_URL") and url:
+            token = env.get(key.removesuffix("URL") + "TOKEN")
+            if token:
+                return url, token
+    return None
 
 
 @lru_cache
