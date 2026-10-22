@@ -89,7 +89,10 @@ export default function App() {
 
       {/* Floating toggle button — visible in main phase when panel is closed */}
       {phase === 'main' && !chatOpen && (
-        <button className="chat-open-btn" onClick={() => setChatOpen(true)}>
+        <button
+          className={`chat-open-btn ${!complete && !DEBUG ? 'chat-open-btn--journey' : ''}`}
+          onClick={() => setChatOpen(true)}
+        >
           Signals
         </button>
       )}

@@ -4,6 +4,7 @@ import { useFrame } from '@react-three/fiber'
 import { easing } from 'maath'
 import * as THREE from 'three'
 import { useReducedMotion } from '../hooks/useReducedMotion'
+import { freeAreaCentre } from '../lib/framing'
 
 /**
  * - demo: no answers yet; the camera holds still while the comet wanders.
@@ -45,6 +46,10 @@ interface Props {
   mapFrame?: THREE.Sphere
 }
 
+// Overlays that cover part of the canvas; the comet is framed in the space they leave.
+const OVERLAYS = ['.journey', '.result']
+const FOCUS_CHECK_SECONDS = 0.25
+
 const FLY_IN_SCALE = 5
 const FLY_IN_SECONDS = 6
 const BASE_FOV = 50
@@ -59,8 +64,9 @@ export function CameraRig({ mode, head, flyIn = false, mapFrame }: Props) {
   const reducedMotion = useReducedMotion()
   const tmp = useMemo(() => ({ goal: new THREE.Vector3(), before: new THREE.Vector3(), offset: new THREE.Vector3() }), [])
   const motion = useRef({ last: new THREE.Vector3(), speed: 0, started: false })
+  const focus = useRef({ x: 0.5, y: 0.5, targetX: 0.5, targetY: 0.5, checkedAt: -Infinity })
 
-  useFrame(({ camera, clock }, delta) => {
+  useFrame(({ camera, clock, gl, size }, delta) => {
     const c = controls.current
     if (!c) return
     const now = clock.getElapsedTime()
@@ -112,6 +118,26 @@ export function CameraRig({ mode, head, flyIn = false, mapFrame }: Props) {
     if (Math.abs(perspective.fov - fov) > 0.01) {
       easing.damp(perspective, 'fov', fov, 0.5, delta)
       perspective.updateProjectionMatrix()
+    }
+
+    // Shift the view so the comet sits in the space the panels leave free,
+    // rather than behind them. Checked a few times a second, eased between.
+    const f = focus.current
+    if (now - f.checkedAt > FOCUS_CHECK_SECONDS) {
+      f.checkedAt = now
+      const overlays = OVERLAYS.flatMap((s) => [...document.querySelectorAll(s)].map((el) => el.getBoundingClientRect()))
+      const centre = freeAreaCentre(gl.domElement.getBoundingClientRect(), overlays)
+      f.targetX = centre.x
+      f.targetY = centre.y
+    }
+    easing.damp(f, 'x', f.targetX, 0.5, delta)
+    easing.damp(f, 'y', f.targetY, 0.5, delta)
+    const offsetX = (0.5 - f.x) * size.width
+    const offsetY = (0.5 - f.y) * size.height
+    if (Math.abs(offsetX) > 0.5 || Math.abs(offsetY) > 0.5) {
+      perspective.setViewOffset(size.width, size.height, offsetX, offsetY, size.width, size.height)
+    } else if (perspective.view?.enabled) {
+      perspective.clearViewOffset()
     }
 
     const idle = !active && now - endedAt > IDLE_RESUME_SECONDS
