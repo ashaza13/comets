@@ -30,20 +30,23 @@ export function MemoryStars({ entries, total, interactive, onHoverChange }: Prop
     onHoverChange?.(next !== null)
   }
 
+  const isHoveredFor = (id: string) => interactive && hovered === id
+
   return (
     <group>
       {entries.map((entry, i) => {
         const position = toWorld(entry.state.personality)
-        const color = emotionColor(entry.state.emotion).multiplyScalar(1.6)
-        const isHovered = interactive && hovered === entry.id
+        // Past answers stay faint so the comet's final place stands out; hover brightens one.
+        const color = emotionColor(entry.state.emotion).multiplyScalar(isHoveredFor(entry.id) ? 1.6 : 0.55)
+        const isHovered = isHoveredFor(entry.id)
         return (
           <group key={entry.id} position={position}>
             {/* Screen-sized (no attenuation) so the stars stay visible from the map's distance. */}
-            <sprite scale={isHovered ? 0.05 : 0.032}>
+            <sprite scale={isHovered ? 0.045 : 0.02}>
               <spriteMaterial map={glow} color={color} sizeAttenuation={false} transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
             </sprite>
-            <sprite scale={0.01}>
-              <spriteMaterial map={glow} color="white" sizeAttenuation={false} transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
+            <sprite scale={isHovered ? 0.01 : 0.006}>
+              <spriteMaterial map={glow} color={isHovered ? 'white' : '#8a8f9c'} sizeAttenuation={false} transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
             </sprite>
             {interactive && (
               <mesh
