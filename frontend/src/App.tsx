@@ -1,5 +1,4 @@
 import { lazy, Suspense, useState, useCallback } from 'react'
-import { Scene } from './components/Scene'
 import { ChatPanel } from './components/ChatPanel'
 import { IntroFlow } from './components/IntroFlow'
 import { JourneyPanel } from './components/journey/JourneyPanel'
@@ -10,6 +9,12 @@ type AppPhase = 'intro' | 'main'
 
 const DEBUG = new URLSearchParams(window.location.search).has('debug')
 const DebugPanel = lazy(() => import('./components/DebugPanel'))
+
+// The 3D scene (three.js, R3F, postprocessing) is most of the code, so it ships
+// as its own chunk. The download starts straight away, in parallel with the
+// intro, rather than when the scene first renders.
+const sceneModule = import('./components/Scene')
+const Scene = lazy(() => sceneModule.then((m) => ({ default: m.Scene })))
 
 export default function App() {
   const entries      = useCometStore((s) => s.entries)
@@ -67,17 +72,19 @@ export default function App() {
         />
       </div>
 
-      {/* 3D scene — always rendered */}
+      {/* 3D scene — always rendered (loaded as its own chunk) */}
       <div className="scene-container">
-        <Scene
-          entries={entries}
-          debugState={debugComet}
-          isLoading={isLoading}
-          chartMode={chartMode}
-          revealed={revealed}
-          showControls={phase === 'main'}
-          flyIn={flyIn}
-        />
+        <Suspense fallback={<div className="scene-fallback" />}>
+          <Scene
+            entries={entries}
+            debugState={debugComet}
+            isLoading={isLoading}
+            chartMode={chartMode}
+            revealed={revealed}
+            showControls={phase === 'main'}
+            flyIn={flyIn}
+          />
+        </Suspense>
       </div>
 
       {/* Floating toggle button — visible in main phase when panel is closed */}

@@ -1,8 +1,10 @@
 import { clampChroma, converter } from 'culori'
-import * as THREE from 'three'
 import type { CometState } from './schema'
 
-type Emotion = CometState['emotion']
+// Kept free of three.js so the interface can use it without loading the scene;
+// the THREE.Color version lives in emotionColor.ts.
+
+export type Emotion = CometState['emotion']
 
 const toOklch = converter('oklch')
 const toRgb = converter('rgb')
@@ -20,12 +22,6 @@ export function emotionRgb({ hue, saturation }: Pick<Emotion, 'hue' | 'saturatio
   const c = MIN_CHROMA + (MAX_CHROMA - MIN_CHROMA) * Math.min(Math.max(saturation, 0), 1)
   const rgb = toRgb(clampChroma({ mode: 'oklch', l: COMA_LIGHTNESS, c, h }, 'oklch'))
   return [clamp01(rgb.r), clamp01(rgb.g), clamp01(rgb.b)]
-}
-
-export function emotionColor(emotion: Pick<Emotion, 'hue' | 'saturation'>, target = new THREE.Color()): THREE.Color {
-  const [r, g, b] = emotionRgb(emotion)
-  // culori returns sRGB; THREE.Color stores linear values.
-  return target.setRGB(r, g, b, THREE.SRGBColorSpace)
 }
 
 export function emotionCss(emotion: Pick<Emotion, 'hue' | 'saturation'>): string {

@@ -80,6 +80,9 @@ button { font-family: inherit; }
   min-width: 0;
 }
 
+/* Shown for the moment the scene's chunk is still loading; matches the canvas. */
+.scene-fallback { position: absolute; inset: 0; background: #04040a; }
+
 /* ── Signals panel ───────────────────────────────────────────────────────── */
 
 .chat-panel-wrapper {
