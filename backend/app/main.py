@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, HTTPException, Path, Response
+from fastapi import Depends, FastAPI, HTTPException, Path, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.comet import apply_observation
@@ -13,6 +13,8 @@ from app.groups import (
     MemberIn,
     MemoryStore,
     UpstashStore,
+    client_key,
+    creation_retry_after,
     new_group_id,
     public_id,
     sort_members,
@@ -104,9 +106,25 @@ def sharing(store: Store):
     return {"enabled": store is not None}
 
 
+def client_ip(request: Request) -> str:
+    # Vercel's edge sets x-real-ip to the caller's address (and overwrites any
+    # client-supplied value); x-forwarded-for and the socket are fallbacks for elsewhere.
+    forwarded = request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+    return request.headers.get("x-real-ip") or forwarded or (request.client.host if request.client else "unknown")
+
+
 @app.post("/groups", status_code=201)
-def create_group(store: Store):
+def create_group(request: Request, store: Store):
     s = _require(store)
+    retry_after = creation_retry_after(s, client_key(client_ip(request)))
+    if retry_after is not None:
+        minutes = max(1, round(retry_after / 60))
+        wait = f"{minutes} minute{'s' if minutes != 1 else ''}" if minutes < 90 else f"{round(minutes / 60)} hours"
+        raise HTTPException(
+            status_code=429,
+            detail=f"You've made a lot of constellations recently. Try again in {wait}.",
+            headers={"Retry-After": str(retry_after)},
+        )
     for _ in range(5):
         group_id = new_group_id()
         if s.create(group_id):

@@ -4,10 +4,10 @@ import { useFrame } from '@react-three/fiber'
 import { easing } from 'maath'
 import * as THREE from 'three'
 import { useReducedMotion } from '../hooks/useReducedMotion'
-import { freeAreaCentre } from '../lib/framing'
+import { clearCentre, freeAreaCentre } from '../lib/framing'
 
 /**
- * - demo: no answers yet; the camera holds still while the comet wanders.
+ * - demo: no answers yet; the camera keeps the wandering comet centred.
  * - journey: answering questions; the camera travels with the comet.
  * - replay: the journey is replaying; the camera rides along close behind.
  * - map: every question answered; the camera orbits the comet's final place,
@@ -20,7 +20,7 @@ const DISTANCE: Record<Exclude<CameraMode, 'map'>, number> = { demo: 8.4, journe
 const ZOOM_LIMIT: Record<CameraMode, number> = { demo: 14, journey: 14, replay: 30, map: 160 }
 // How closely the orbit target trails the comet (smoothing time, seconds). Replays
 // travel faster than live voyages, so the camera keeps up more tightly.
-const FOLLOW: Record<CameraMode, number> = { demo: 1.4, journey: 0.6, replay: 0.12, map: 0.8 }
+const FOLLOW: Record<CameraMode, number> = { demo: 0.6, journey: 0.6, replay: 0.12, map: 0.8 }
 const MAP_MIN_DISTANCE = 16
 // How long the camera eases towards a mode's framing distance after the mode changes.
 const FRAMING_SECONDS = 3
@@ -49,6 +49,8 @@ interface Props {
 // Overlays that cover part of the canvas; the comet is framed in the space they leave.
 const OVERLAYS = ['.journey', '.result']
 const FOCUS_CHECK_SECONDS = 0.25
+// While answering, the comet's glow keeps at least this far (px) from a panel.
+const COMET_CLEARANCE = 56
 
 const FLY_IN_SCALE = 5
 const FLY_IN_SECONDS = 6
@@ -92,7 +94,7 @@ export function CameraRig({ mode, head, flyIn = false, mapFrame }: Props) {
     // Follow: move the orbit target to the comet and carry the camera along by
     // the same amount, so the user's chosen angle and zoom are kept.
     const { goal, before, offset } = tmp
-    if (mode !== 'demo' && head.current) goal.copy(head.current.position)
+    if (head.current) goal.copy(head.current.position)
     else goal.copy(ORIGIN)
     before.copy(c.target)
     easing.damp3(c.target, goal, FOLLOW[mode], delta)
@@ -134,7 +136,11 @@ export function CameraRig({ mode, head, flyIn = false, mapFrame }: Props) {
     if (now - f.checkedAt > FOCUS_CHECK_SECONDS) {
       f.checkedAt = now
       const overlays = OVERLAYS.flatMap((s) => [...document.querySelectorAll(s)].map((el) => el.getBoundingClientRect()))
-      const centre = freeAreaCentre(gl.domElement.getBoundingClientRect(), overlays)
+      const canvas = gl.domElement.getBoundingClientRect()
+      // Answering: the comet stays mid-screen, nudged only clear of the panel.
+      // The map: centred in the space beside or below the result card.
+      const centre =
+        mode === 'journey' || mode === 'demo' ? clearCentre(canvas, overlays, COMET_CLEARANCE) : freeAreaCentre(canvas, overlays)
       f.targetX = centre.x
       f.targetY = centre.y
     }

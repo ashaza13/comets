@@ -91,6 +91,30 @@ class GroupStore(Protocol):
     def members(self, group_id: str) -> list[Member]: ...
     def upsert(self, group_id: str, member: Member) -> None: ...
     def remove(self, group_id: str, member_id: str) -> None: ...
+    def hit(self, key: str, window_seconds: int) -> int:
+        """Count one event against `key` in the current fixed window; returns the count so far."""
+        ...
+
+
+# Group creation is limited per client, over a short burst window and a whole day.
+# (limit, window in seconds)
+CREATE_LIMITS = ((5, 10 * 60), (20, 24 * 3600))
+
+
+def client_key(ip: str) -> str:
+    # Hashed so raw IP addresses never reach storage.
+    return hashlib.sha256(f"comets:{ip}".encode()).hexdigest()[:16]
+
+
+def creation_retry_after(store: "GroupStore", client: str, now: float | None = None) -> int | None:
+    """Records a group creation for `client`. Returns None if it's allowed, otherwise
+    the seconds until the limit that was hit resets."""
+    now = time.time() if now is None else now
+    for limit, window in CREATE_LIMITS:
+        count = store.hit(f"ratelimit:create:{window}:{client}:{int(now // window)}", window)
+        if count > limit:
+            return int(window - now % window) + 1
+    return None
 
 
 # The group's hash also holds this marker field, so an empty group still exists.
@@ -102,6 +126,7 @@ class MemoryStore:
 
     def __init__(self) -> None:
         self._groups: dict[str, dict[str, Member]] = {}
+        self._counts: dict[str, int] = {}
 
     def create(self, group_id: str) -> bool:
         if group_id in self._groups:
@@ -123,6 +148,11 @@ class MemoryStore:
 
     def remove(self, group_id: str, member_id: str) -> None:
         self._groups.get(group_id, {}).pop(member_id, None)
+
+    def hit(self, key: str, window_seconds: int) -> int:
+        # Window keys embed the window index, so old ones are simply never read again.
+        self._counts[key] = self._counts.get(key, 0) + 1
+        return self._counts[key]
 
 
 class UpstashStore:
@@ -169,6 +199,10 @@ class UpstashStore:
 
     def remove(self, group_id: str, member_id: str) -> None:
         self._pipeline(["HDEL", self._key(group_id), member_id])
+
+    def hit(self, key: str, window_seconds: int) -> int:
+        count, _ = self._pipeline(["INCR", key], ["EXPIRE", key, window_seconds])
+        return int(count)
 
 
 def sort_members(members: list[Member]) -> list[Member]:

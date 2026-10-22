@@ -176,7 +176,9 @@ interests you share. Joining a different link moves you to that constellation.
 Only a name and the final reading (position, certainty, mood and top five interests) are stored,
 never the answers. Each device writes its entry with a private secret; others see only a hash of
 it, salted per constellation. Constellations hold up to 50 people and expire 180 days after
-their last change.
+their last change. Creating constellations is rate limited per client (5 per 10 minutes and 20
+per day, counted in Redis against a hash of the caller's IP); the server answers `429` with a
+`Retry-After` header past that.
 
 Storage is [Upstash Redis](https://vercel.com/marketplace/upstash) over its REST API. In the Vercel
 project, add it under **Storage → Create Database → Upstash for Redis** and connect it to the

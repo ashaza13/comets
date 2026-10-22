@@ -4,7 +4,17 @@ import httpx
 import pytest
 from fastapi.testclient import TestClient
 
-from app.groups import MAX_MEMBERS, Member, MemberIn, MemoryStore, UpstashStore, public_id, to_member
+from app.groups import (
+    CREATE_LIMITS,
+    MAX_MEMBERS,
+    Member,
+    MemberIn,
+    MemoryStore,
+    UpstashStore,
+    creation_retry_after,
+    public_id,
+    to_member,
+)
 from app.main import app, get_store
 from app.signals.models import CometState
 
@@ -100,6 +110,7 @@ class FakeRedis:
     def __init__(self) -> None:
         self.data: dict[str, dict[str, str]] = {}
         self.ttl: dict[str, int] = {}
+        self.counts: dict[str, int] = {}
 
     def handle(self, request: httpx.Request) -> httpx.Response:
         assert request.url.path == "/pipeline"
@@ -128,6 +139,9 @@ class FakeRedis:
                 return int(bool(h and h.pop(args[0], None)))
             case "EXISTS":
                 return int(h is not None)
+            case "INCR":
+                self.counts[key] = self.counts.get(key, 0) + 1
+                return self.counts[key]
             case "EXPIRE":
                 self.ttl[key] = args[0]
                 return 1
@@ -166,3 +180,37 @@ def test_redis_credentials_with_a_custom_prefix():
     assert prefixed_kv_rest(env) == ("https://x.upstash.io", "read-write")
     assert prefixed_kv_rest({"STORAGE_KV_REST_API_URL": "https://x.upstash.io"}) is None
     assert prefixed_kv_rest({}) is None
+
+
+def test_group_creation_is_rate_limited_per_client(store):
+    burst = CREATE_LIMITS[0][0]
+    me = {"x-real-ip": "203.0.113.7"}
+    for _ in range(burst):
+        assert client.post("/groups", headers=me).status_code == 201
+    r = client.post("/groups", headers=me)
+    assert r.status_code == 429
+    assert 0 < int(r.headers["Retry-After"]) <= CREATE_LIMITS[0][1] + 1
+    assert "Try again in" in r.json()["detail"]
+    # Someone else isn't affected, and joining or reading isn't limited.
+    other = client.post("/groups", headers={"x-real-ip": "198.51.100.4"})
+    assert other.status_code == 201
+    assert client.get(f"/groups/{other.json()['id']}", headers=me).status_code == 200
+
+
+def test_daily_limit_holds_across_burst_windows():
+    store = MemoryStore()
+    (burst, burst_window), (daily, _) = CREATE_LIMITS
+    allowed = 0
+    # Spread creations over successive burst windows within one day.
+    for i in range(daily + burst):
+        now = 86400 * 1000 + (i // burst) * burst_window
+        if creation_retry_after(store, "client", now) is None:
+            allowed += 1
+    assert allowed == daily
+
+
+def test_upstash_rate_limit_counter():
+    redis = FakeRedis()
+    store = UpstashStore("https://redis.example", "token", httpx.Client(transport=httpx.MockTransport(redis.handle)))
+    assert [store.hit("k", 60) for _ in range(3)] == [1, 2, 3]
+    assert redis.ttl["k"] == 60
