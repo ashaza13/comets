@@ -1,12 +1,12 @@
-@import '@fontsource-variable/newsreader/opsz.css';
-@import '@fontsource-variable/newsreader/opsz-italic.css';
+@import '@fontsource-variable/cormorant/wght.css';
+@import '@fontsource-variable/cormorant/wght-italic.css';
 @import '@fontsource-variable/hanken-grotesk/index.css';
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 /*
  * An observatory notebook rather than a dashboard: warm parchment text on ink,
- * an editorial serif for anything you read, a plain grotesk for controls, and
+ * Cormorant, a fine-lined display serif like star-atlas engraving, for anything you read, a plain grotesk for controls, and
  * one starlight accent used sparingly. The sky supplies the colour.
  */
 :root {
@@ -22,7 +22,7 @@
   --accent-ink:   #1b1508;
   --danger:       #e58a72;
   --radius:       4px;
-  --serif:        'Newsreader Variable', 'Iowan Old Style', Georgia, serif;
+  --serif:        'Cormorant Variable', 'Cormorant Garamond', Georgia, serif;
   --sans:         'Hanken Grotesk Variable', system-ui, -apple-system, sans-serif;
 }
 
@@ -117,7 +117,7 @@ button { font-family: inherit; }
 
 .chat-title {
   font-family: var(--serif);
-  font-size: 18px;
+  font-size: 20.5px;
   font-weight: 450;
   color: var(--text);
   letter-spacing: -0.005em;
@@ -182,8 +182,9 @@ button { font-family: inherit; }
   text-align: center;
   margin-top: 32px;
   font-family: var(--serif);
+  font-weight: 500;
   font-style: italic;
-  font-size: 14px;
+  font-size: 16px;
 }
 
 .chat-message { display: flex; flex-direction: column; gap: 6px; }
@@ -192,7 +193,8 @@ button { font-family: inherit; }
 
 .message-text {
   font-family: var(--serif);
-  font-size: 15px;
+  font-weight: 500;
+  font-size: 17px;
   line-height: 1.45;
   color: var(--text);
   padding-left: 10px;
@@ -212,8 +214,9 @@ button { font-family: inherit; }
 
 .readout-reasoning {
   font-family: var(--serif);
+  font-weight: 500;
   font-style: italic;
-  font-size: 13px;
+  font-size: 15px;
   color: var(--text-3);
   margin-top: 2px;
 }
@@ -337,8 +340,9 @@ button { font-family: inherit; }
 
 .nt-label {
   font-family: var(--serif);
+  font-weight: 500;
   font-style: italic;
-  font-size: 13px;
+  font-size: 15px;
   color: var(--text-3);
 }
 
@@ -366,12 +370,14 @@ button { font-family: inherit; }
 
 .memory-text {
   font-family: var(--serif);
-  font-size: 15px;
+  font-weight: 500;
+  font-size: 17px;
   line-height: 1.35;
   color: var(--text);
 }
 
-.memory-reading { font-family: var(--serif); font-style: italic; font-size: 13px; color: var(--text-2); }
+.memory-reading { font-family: var(--serif);
+  font-weight: 500; font-style: italic; font-size: 15px; color: var(--text-2); }
 
 .memory-axes { display: flex; gap: 10px; font-size: 11.5px; }
 
@@ -421,14 +427,15 @@ button { font-family: inherit; }
 
 .intro-eyebrow {
   font-family: var(--serif);
+  font-weight: 500;
   font-style: italic;
-  font-size: 17px;
+  font-size: 19.5px;
   color: var(--text-3);
 }
 
 .intro-title {
   font-family: var(--serif);
-  font-size: clamp(40px, 8vw, 64px);
+  font-size: clamp(48px, 9vw, 78px);
   font-weight: 400;
   line-height: 1.02;
   letter-spacing: -0.02em;
@@ -447,7 +454,7 @@ button { font-family: inherit; }
 
 .intro-axis-label {
   font-family: var(--serif);
-  font-size: 24px;
+  font-size: 27.5px;
   line-height: 1.2;
 }
 
@@ -586,8 +593,9 @@ button { font-family: inherit; }
 
 .journey-hint {
   font-family: var(--serif);
+  font-weight: 500;
   font-style: italic;
-  font-size: 15px;
+  font-size: 17px;
   color: var(--text-3);
   text-align: center;
   margin-bottom: -8px;
@@ -595,7 +603,7 @@ button { font-family: inherit; }
 
 .journey-prompt {
   font-family: var(--serif);
-  font-size: 30px;
+  font-size: 34.5px;
   font-weight: 400;
   line-height: 1.15;
   letter-spacing: -0.012em;
@@ -662,8 +670,9 @@ button { font-family: inherit; }
   position: absolute;
   transform: translate(-50%, -50%);
   font-family: var(--serif);
+  font-weight: 500;
   font-style: italic;
-  font-size: 13.5px;
+  font-size: 15.5px;
   color: var(--text-3);
   pointer-events: none;
   white-space: nowrap;
@@ -683,7 +692,7 @@ button { font-family: inherit; }
 .mood-reading {
   font-family: var(--serif);
   font-style: italic;
-  font-size: 18px;
+  font-size: 20.5px;
   color: var(--text);
   min-height: 1.4em;
 }
@@ -789,7 +798,8 @@ button { font-family: inherit; }
 
 .topic--on::before { opacity: 1; }
 
-.topic-level { font-family: var(--serif); font-style: italic; font-size: 13px; color: var(--accent); }
+.topic-level { font-family: var(--serif);
+  font-weight: 500; font-style: italic; font-size: 15px; color: var(--accent); }
 
 /* Say more */
 
@@ -813,7 +823,7 @@ button { font-family: inherit; }
 
 @media (max-width: 640px) {
   .journey { bottom: 76px; padding: 16px 16px 14px; }
-  .journey-prompt { font-size: 24px; }
+  .journey-prompt { font-size: 28px; }
 }
 
 /* ── Result card (where the journey ended) ───────────────────────────────── */
@@ -856,12 +866,13 @@ button { font-family: inherit; }
 
 .result-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
 
-.result-kicker { font-family: var(--serif); font-style: italic; font-size: 15px; color: var(--text-3); }
+.result-kicker { font-family: var(--serif);
+  font-weight: 500; font-style: italic; font-size: 17px; color: var(--text-3); }
 
 .result-title {
   margin-top: 2px;
   font-family: var(--serif);
-  font-size: 23px;
+  font-size: 26.5px;
   font-weight: 400;
   line-height: 1.15;
   letter-spacing: -0.01em;
@@ -944,8 +955,9 @@ button { font-family: inherit; }
   align-items: center;
   gap: 7px;
   font-family: var(--serif);
+  font-weight: 500;
   font-style: italic;
-  font-size: 16px;
+  font-size: 18.5px;
   color: var(--text);
 }
 
@@ -981,7 +993,7 @@ button { font-family: inherit; }
   .result-chip { top: 12px; right: 16px; }
   /* Compact on phones so the comet, centre screen, stays visible below the card. */
   .result { max-height: 42%; padding: 13px 14px 11px; gap: 9px; }
-  .result-title { font-size: 18px; }
+  .result-title { font-size: 21px; }
   .result-desc,
   .result-foot .dim { display: none; }
   .result-foot { padding-top: 8px; justify-content: flex-end; }

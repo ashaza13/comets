@@ -3,7 +3,7 @@ import { Billboard, Line, Text } from '@react-three/drei'
 import { useFrame } from '@react-three/fiber'
 import { easing } from 'maath'
 import * as THREE from 'three'
-import fontUrl from '@fontsource/newsreader/files/newsreader-latin-400-italic.woff?url'
+import fontUrl from '@fontsource/cormorant/files/cormorant-latin-500-italic.woff?url'
 import { AXES, SPACE_SCALE, type Axis, type Vec3Tuple } from '../lib/spec'
 import { axisLabelVisibility } from '../lib/sky'
 import { createGlowTexture } from '../lib/textures'
@@ -12,7 +12,7 @@ const EXTENT = SPACE_SCALE * 1.55
 const DOT_SPACING = EXTENT / 25
 const RING_RADIUS = SPACE_SCALE * 1.67
 // Label height as a fraction of its distance from the camera.
-const LABEL_SIZE = 0.028
+const LABEL_SIZE = 0.032
 
 const UNIT: Record<Axis['key'], THREE.Vector3> = {
   x: new THREE.Vector3(1, 0, 0),
