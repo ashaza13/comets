@@ -16,6 +16,7 @@ import { AXES, domainColor } from '../lib/spec'
 import type { JourneyPath } from '../lib/playback'
 import { meanUncertainty, toWorld } from '../lib/tail'
 import { createVoyage, fly, settle, steer } from '../lib/voyage'
+import type { Progress } from './Tail'
 
 const NO_INTERESTS: Record<string, number> = {}
 
@@ -42,8 +43,8 @@ interface Props {
   path: JourneyPath | null
   /** Curve parameter to hold while replaying or scrubbing; null when live. */
   replayT: number | null
-  /** Written every frame: how far along the curve the comet is (0–1), for the tail. */
-  progress: { t: number }
+  /** Written every frame: how far along the curve the comet is, for the tail. */
+  progress: Progress
   /** Hide the hover tooltip (e.g. while a memory card is open). */
   hideTooltip?: boolean
   /** Show exact numbers in the tooltip (chart mode) instead of plain language. */
@@ -100,6 +101,8 @@ export const Comet = forwardRef<CometHandle, Props>(function Comet(
       // No journey (yet, or after starting a new comet): the next flight starts at the origin.
       settle(voyage.current, 0)
       progress.t = 0
+      progress.from = 0
+      progress.moving = false
     } else {
       emotionColor(state.emotion, targetColor)
       const v = voyage.current
@@ -110,6 +113,8 @@ export const Comet = forwardRef<CometHandle, Props>(function Comet(
       if (position && path) {
         settle(v, replayT! * (points - 1))
         progress.t = replayT!
+        progress.from = 0
+        progress.moving = false
         // Replays and scrubbing: sit exactly on the journey curve, gliding
         // onto it first when the replay starts or the playhead jumps.
         if (!m.pinned || position.distanceTo(m.lastPin) > PIN_JUMP) m.catching = true
@@ -137,6 +142,8 @@ export const Comet = forwardRef<CometHandle, Props>(function Comet(
         springStep(g.position, m.velocity, targetPos, FLIGHT_SMOOTH_TIME, delta)
         sprung = true
         progress.t = v.u / (points - 1)
+        progress.from = v.from / (points - 1)
+        progress.moving = v.active
       } else {
         // Nothing to fly yet (only the mood answered): settle at the origin.
         m.pinned = false
@@ -145,6 +152,8 @@ export const Comet = forwardRef<CometHandle, Props>(function Comet(
         springStep(g.position, m.velocity, targetPos, VOYAGE_SMOOTH_TIME, delta, VOYAGE_MAX_SPEED)
         sprung = true
         progress.t = 0
+        progress.from = 0
+        progress.moving = false
       }
       restored.current = false
       easing.damp(l, 'energy', energyGlow(state.emotion.lightness), 0.6, delta)

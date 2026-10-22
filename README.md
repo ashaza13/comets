@@ -154,13 +154,16 @@ Taps are scored in the browser with a TypeScript port of the backend's update ma
 take an optional **say more**, typed or dictated, which Claude reads on the backend.
 
 While you answer, the camera travels with the comet and the axes stay hidden; each answer fires a
-flare and the comet sets off for its new position, leaving a memory star behind. It doesn't go in a
+flare and the comet sets off for its new position. It doesn't go in a
 straight line: each move takes a winding route through one or two random detours (seeded by the
 answer, so replays retrace it exactly), flown at a random cruising speed with a slow drift, and an
 answer mid-flight carries straight on into the next leg. Each move is also a hyperspace jump:
 stars stretch into a tunnel of streaks radiating from the comet, a blue-white flash fires, the view
 lurches wider, and the whole sky swings round to a new region while it's hidden, so every answer
-arrives somewhere new (reduced motion keeps the new sky, without the tunnel or flash). After the last step
+arrives somewhere new (reduced motion keeps the new sky, without the tunnel or flash). Distant
+galaxies scattered over the sky turn with it, so each arrival shows different landmarks. While you
+answer, the comet trails only a wake for the leg it's flying, which dissolves behind it on arrival:
+the route so far, and the stars marking past answers, stay hidden until the map. After the last step
 the journey replays from the start with the camera riding along, then it pulls back to the comet's
 final place and the axes fade in around it. Dashed lines drop from the comet to each axis, and a
 "where you landed" card reads out each dimension on a scale, with a band for how sure the estimate

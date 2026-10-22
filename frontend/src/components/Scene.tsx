@@ -9,6 +9,7 @@ import { Comet, type CometHandle } from './Comet'
 import { Constellations } from './Constellations'
 import { FinalMarker } from './FinalMarker'
 import { FriendStars } from './FriendStars'
+import { Galaxies } from './Galaxies'
 import { Hyperspace } from './Hyperspace'
 import { Flare } from './Flare'
 import { MemoryStars } from './MemoryStars'
@@ -16,7 +17,7 @@ import { Nebula } from './Nebula'
 import { ResultCard } from './ResultCard'
 import { SpaceDust } from './SpaceDust'
 import { Starfield } from './Starfield'
-import { Tail } from './Tail'
+import { Tail, type Progress } from './Tail'
 import { WarpDrive, WarpFlash } from './WarpDrive'
 import { Timeline } from './Timeline'
 import { useConstellation } from '../groupStore'
@@ -78,7 +79,7 @@ export function Scene({ entries, debugState, isLoading, chartMode, revealed, sho
     [fullHistory, friends, path],
   )
   // How far along the path the comet is: written by the comet, read by the tail.
-  const progress = useMemo(() => ({ t: 0 }), [])
+  const progress = useMemo<Progress>(() => ({ t: 0, from: 0, moving: false }), [])
   // Hyperspace jumps: fired by WarpDrive, felt by the sky, dust, tunnel and camera.
   const warp = useMemo(() => createWarp(), [])
   const finalState = fullHistory.at(-1)
@@ -156,18 +157,30 @@ export function Scene({ entries, debugState, isLoading, chartMode, revealed, sho
 
   // Memory stars for answers already passed; the live comet itself marks the latest.
   const passed = playhead === null ? Math.max(total - 1, 0) : Math.floor(playhead)
-  const memories = useMemo(() => (debugState ? [] : entries.slice(0, passed)), [debugState, entries, passed])
+  // Hidden while answering, like the full route: the past is revealed on the map.
+  const memories = useMemo(
+    () => (debugState || cameraMode === 'journey' ? [] : entries.slice(0, passed)),
+    [debugState, cameraMode, entries, passed],
+  )
 
   return (
     <>
       <Canvas camera={{ position: [4.6, 2.4, 6.4], fov: 50, far: 2000 }} gl={{ antialias: true }} style={{ background: '#04040a' }}>
         <AdaptiveDpr pixelated={false} />
         <Nebula tint={tint} warp={warp} />
+        <Galaxies warp={warp} />
         <Starfield warp={warp} />
         <SpaceDust warp={warp} />
         <Hyperspace warp={warp} />
         <Constellations chartMode={chartMode} revealed={mapShown} />
-        <Tail history={history} head={head} look={look} path={debugState ? null : path} progress={progress} />
+        <Tail
+          history={history}
+          head={head}
+          look={look}
+          path={debugState ? null : path}
+          progress={progress}
+          wake={cameraMode === 'journey'}
+        />
         <FriendStars friends={friends} visible={mapShown && !debugState} />
         <MemoryStars entries={memories} total={total} interactive={mapShown} onHoverChange={setMemoryOpen} />
         <Comet

@@ -44,17 +44,37 @@ interface Props {
    * comet every frame. The tail is the curve's first t, the route actually
    * flown, so it grows smoothly instead of re-bending at each answer.
    */
-  progress: { t: number }
+  progress: Progress
+  /**
+   * While answering, draw only the comet's wake (the leg it's flying, which
+   * dissolves behind it on arrival) so the route so far isn't on show and each
+   * jump feels like leaving it far behind. The whole route is revealed on the map.
+   */
+  wake: boolean
+}
+
+/** Written by the comet each frame (curve parameters, 0–1). */
+export interface Progress {
+  t: number
+  /** Where the current leg began. */
+  from: number
+  /** Whether the comet is flying a leg right now. */
+  moving: boolean
 }
 
 // Below this curve parameter the tail is too short to draw.
 const MIN_T = 1e-4
+// After arriving, the wake shrinks into the comet over roughly this many seconds.
+const WAKE_FADE_SECONDS = 1.6
 // The last share of the tail bends onto the comet, which drifts a little off the curve.
 const HEAD_BLEND = 0.12
 
-export function Tail({ history, head, look, path, progress }: Props) {
+export function Tail({ history, head, look, path, progress, wake }: Props) {
   const colorStates = useMemo(() => path?.states ?? [], [path])
   const recent = path === null && history.length === 0
+  // The wake and the pre-journey trail are drawn in the comet's own colour.
+  const plain = recent || wake
+  const wakeStart = useRef(0)
   const lineMesh = useRef<THREE.Mesh>(null)
   const dustPoints = useRef<THREE.Points>(null)
   const geometry = useRef<MeshLineGeometry>(null)
@@ -91,11 +111,11 @@ export function Tail({ history, head, look, path, progress }: Props) {
 
   // Per-observation emotion colours along the ribbon's length.
   const colors = useMemo(
-    () => (recent ? new Uint8Array([255, 255, 255, 0, 255, 255, 255, 255]) : tailTexture(colorStates)),
-    [colorStates, recent],
+    () => (plain ? new Uint8Array([255, 255, 255, 0, 255, 255, 255, 255]) : tailTexture(colorStates)),
+    [colorStates, plain],
   )
 
-  useFrame(({ size, clock }) => {
+  useFrame(({ size, clock }, delta) => {
     const headPos = head.current?.position
     const l = look.current
     if (!headPos || !l || !geometry.current || !material.current) return
@@ -114,14 +134,27 @@ export function Tail({ history, head, look, path, progress }: Props) {
     if (path) {
       sampled.current = []
       const t = Math.max(progress.t, MIN_T)
-      points = Array.from({ length: SAMPLES + 1 }, (_, i) => path.curve.getPoint((i / SAMPLES) * t))
+      let start = 0
+      if (wake) {
+        // Follow the leg being flown; once arrived, draw the wake in after the comet.
+        const target = progress.moving ? progress.from : t
+        const ws = wakeStart.current
+        wakeStart.current = target < ws && progress.moving ? target : target + (ws - target) * Math.exp(-delta / (WAKE_FADE_SECONDS / 3))
+        start = Math.min(wakeStart.current, t)
+      } else {
+        wakeStart.current = progress.t
+      }
+      points = Array.from({ length: SAMPLES + 1 }, (_, i) => path.curve.getPoint(start + (i / SAMPLES) * (t - start)))
       const gap = offset.subVectors(headPos, points[SAMPLES])
       for (let i = 0; i <= SAMPLES; i++) {
         const w = THREE.MathUtils.smoothstep(i / SAMPLES, 1 - HEAD_BLEND, 1)
         if (w > 0) points[i].addScaledVector(gap, w)
       }
-      colorSpan = t
-      material.current.color.set('white')
+      if (wake) material.current.color.copy(l.color)
+      else {
+        colorSpan = t
+        material.current.color.set('white')
+      }
     } else {
       // No observations to draw: show the recent motion path behind the head.
       const trail = sampled.current
@@ -144,7 +177,7 @@ export function Tail({ history, head, look, path, progress }: Props) {
       dm.uniforms.uSpread.value = l.spread
       dm.uniforms.uPixelRatio.value = pixelRatio
       dm.uniforms.uColorSpan.value = colorSpan
-      if (recent) dm.uniforms.uTint.value.copy(l.color)
+      if (plain) dm.uniforms.uTint.value.copy(l.color)
       else dm.uniforms.uTint.value.setRGB(1.3, 1.3, 1.3)
     }
   })
