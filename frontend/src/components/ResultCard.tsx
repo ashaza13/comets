@@ -35,7 +35,7 @@ export function ResultCard({ state, exact, onReplay }: Props) {
       <header className="result-head">
         <div>
           <div className="result-kicker">where you landed</div>
-          <h2 className="result-title">{AXES.map((a) => describeAxis(a, state.personality[a.key])).join(' · ')}</h2>
+          <h2 className="result-title">{AXES.map((a) => describeAxis(a, state.personality[a.key])).join('\u00a0· ')}</h2>
         </div>
         <button className="result-close" onClick={() => setOpen(false)} aria-label="Hide">
           ×

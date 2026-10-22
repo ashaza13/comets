@@ -1,13 +1,11 @@
-@import '@fontsource-variable/cormorant/wght.css';
-@import '@fontsource-variable/cormorant/wght-italic.css';
-@import '@fontsource-variable/hanken-grotesk/index.css';
+@import '@fontsource-variable/instrument-sans/index.css';
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 /*
  * An observatory notebook rather than a dashboard: warm parchment text on ink,
- * Cormorant, a fine-lined display serif like star-atlas engraving, for anything you read, a plain grotesk for controls, and
- * one starlight accent used sparingly. The sky supplies the colour.
+ * one Swiss-style grotesk (Instrument Sans) with hierarchy carried by weight and
+ * tight tracking, and one starlight accent used sparingly. The sky supplies the colour.
  */
 :root {
   --ink:          #07080b;
@@ -22,8 +20,7 @@
   --accent-ink:   #1b1508;
   --danger:       #e58a72;
   --radius:       4px;
-  --serif:        'Cormorant Variable', 'Cormorant Garamond', Georgia, serif;
-  --sans:         'Hanken Grotesk Variable', system-ui, -apple-system, sans-serif;
+  --sans:         'Instrument Sans Variable', 'Helvetica Neue', Helvetica, Arial, sans-serif;
 }
 
 html, body, #root { height: 100%; overflow: hidden; }
@@ -116,11 +113,10 @@ button { font-family: inherit; }
 }
 
 .chat-title {
-  font-family: var(--serif);
-  font-size: 20.5px;
-  font-weight: 450;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
   color: var(--text);
-  letter-spacing: -0.005em;
 }
 
 .chat-header-right { display: flex; align-items: center; gap: 12px; }
@@ -178,13 +174,10 @@ button { font-family: inherit; }
 }
 
 .chat-empty {
+  font-size: 13px;
   color: var(--text-3);
   text-align: center;
   margin-top: 32px;
-  font-family: var(--serif);
-  font-weight: 500;
-  font-style: italic;
-  font-size: 16px;
 }
 
 .chat-message { display: flex; flex-direction: column; gap: 6px; }
@@ -192,9 +185,9 @@ button { font-family: inherit; }
 .message-prompt { color: var(--text-3); font-size: 11.5px; }
 
 .message-text {
-  font-family: var(--serif);
+  font-size: 14px;
   font-weight: 500;
-  font-size: 17px;
+  letter-spacing: -0.005em;
   line-height: 1.45;
   color: var(--text);
   padding-left: 10px;
@@ -213,18 +206,13 @@ button { font-family: inherit; }
 .readout-interests { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
 
 .readout-reasoning {
-  font-family: var(--serif);
-  font-weight: 500;
-  font-style: italic;
-  font-size: 15px;
+  font-size: 12.5px;
   color: var(--text-3);
   margin-top: 2px;
 }
 
 .loading-msg {
   color: var(--text-3);
-  font-family: var(--serif);
-  font-style: italic;
 }
 
 .loading-dots::after {
@@ -339,10 +327,8 @@ button { font-family: inherit; }
 .nt-section { display: flex; flex-direction: column; gap: 3px; }
 
 .nt-label {
-  font-family: var(--serif);
-  font-weight: 500;
-  font-style: italic;
-  font-size: 15px;
+  font-size: 11px;
+  font-weight: 600;
   color: var(--text-3);
 }
 
@@ -369,15 +355,17 @@ button { font-family: inherit; }
 .memory-prompt { color: var(--text-3); font-size: 11.5px; }
 
 .memory-text {
-  font-family: var(--serif);
+  font-size: 14px;
   font-weight: 500;
-  font-size: 17px;
+  letter-spacing: -0.005em;
   line-height: 1.35;
   color: var(--text);
 }
 
-.memory-reading { font-family: var(--serif);
-  font-weight: 500; font-style: italic; font-size: 15px; color: var(--text-2); }
+.memory-reading {
+  font-size: 12.5px;
+  color: var(--text-2);
+}
 
 .memory-axes { display: flex; gap: 10px; font-size: 11.5px; }
 
@@ -426,19 +414,16 @@ button { font-family: inherit; }
 .intro-slide { display: flex; flex-direction: column; gap: 20px; }
 
 .intro-eyebrow {
-  font-family: var(--serif);
+  font-size: 13px;
   font-weight: 500;
-  font-style: italic;
-  font-size: 19.5px;
   color: var(--text-3);
 }
 
 .intro-title {
-  font-family: var(--serif);
-  font-size: clamp(48px, 9vw, 78px);
-  font-weight: 400;
+  font-size: clamp(44px, 8vw, 72px);
+  font-weight: 600;
+  letter-spacing: -0.035em;
   line-height: 1.02;
-  letter-spacing: -0.02em;
   color: var(--text);
 }
 
@@ -453,8 +438,9 @@ button { font-family: inherit; }
 .intro-axis-row { display: flex; flex-direction: column; gap: 2px; }
 
 .intro-axis-label {
-  font-family: var(--serif);
-  font-size: 27.5px;
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
   line-height: 1.2;
 }
 
@@ -592,21 +578,17 @@ button { font-family: inherit; }
 }
 
 .journey-hint {
-  font-family: var(--serif);
-  font-weight: 500;
-  font-style: italic;
-  font-size: 17px;
+  font-size: 13px;
   color: var(--text-3);
   text-align: center;
   margin-bottom: -8px;
 }
 
 .journey-prompt {
-  font-family: var(--serif);
-  font-size: 34.5px;
-  font-weight: 400;
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
   line-height: 1.15;
-  letter-spacing: -0.012em;
   text-align: center;
   color: var(--text);
   text-wrap: balance;
@@ -667,12 +649,10 @@ button { font-family: inherit; }
 }
 
 .mood-label {
+  font-size: 11.5px;
+  font-weight: 500;
   position: absolute;
   transform: translate(-50%, -50%);
-  font-family: var(--serif);
-  font-weight: 500;
-  font-style: italic;
-  font-size: 15.5px;
   color: var(--text-3);
   pointer-events: none;
   white-space: nowrap;
@@ -690,9 +670,8 @@ button { font-family: inherit; }
 .mood-energy input { flex: 1; accent-color: var(--accent); }
 
 .mood-reading {
-  font-family: var(--serif);
-  font-style: italic;
-  font-size: 20.5px;
+  font-size: 15px;
+  font-weight: 500;
   color: var(--text);
   min-height: 1.4em;
 }
@@ -798,8 +777,11 @@ button { font-family: inherit; }
 
 .topic--on::before { opacity: 1; }
 
-.topic-level { font-family: var(--serif);
-  font-weight: 500; font-style: italic; font-size: 15px; color: var(--accent); }
+.topic-level {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent);
+}
 
 /* Say more */
 
@@ -823,7 +805,7 @@ button { font-family: inherit; }
 
 @media (max-width: 640px) {
   .journey { bottom: 76px; padding: 16px 16px 14px; }
-  .journey-prompt { font-size: 28px; }
+  .journey-prompt { font-size: 22px; }
 }
 
 /* ── Result card (where the journey ended) ───────────────────────────────── */
@@ -866,16 +848,18 @@ button { font-family: inherit; }
 
 .result-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
 
-.result-kicker { font-family: var(--serif);
-  font-weight: 500; font-style: italic; font-size: 17px; color: var(--text-3); }
+.result-kicker {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--text-3);
+}
 
 .result-title {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
   margin-top: 2px;
-  font-family: var(--serif);
-  font-size: 26.5px;
-  font-weight: 400;
   line-height: 1.15;
-  letter-spacing: -0.01em;
   color: var(--text);
 }
 
@@ -951,13 +935,11 @@ button { font-family: inherit; }
 .result-row > .dim { width: 56px; flex: none; }
 
 .result-feeling {
+  font-size: 14px;
+  font-weight: 500;
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  font-family: var(--serif);
-  font-weight: 500;
-  font-style: italic;
-  font-size: 18.5px;
   color: var(--text);
 }
 
@@ -993,7 +975,7 @@ button { font-family: inherit; }
   .result-chip { top: 12px; right: 16px; }
   /* Compact on phones so the comet, centre screen, stays visible below the card. */
   .result { max-height: 42%; padding: 13px 14px 11px; gap: 9px; }
-  .result-title { font-size: 21px; }
+  .result-title { font-size: 18px; }
   .result-desc,
   .result-foot .dim { display: none; }
   .result-foot { padding-top: 8px; justify-content: flex-end; }
