@@ -13,14 +13,20 @@ import { certaintyNote, describeAxis, describeDepth, describeEmotion } from '../
 import { createLook, headingFrom, springStep, type CometLook } from '../lib/comet'
 import type { CometState } from '../lib/schema'
 import { AXES, domainColor } from '../lib/spec'
+import type { JourneyPath } from '../lib/playback'
 import { meanUncertainty, toWorld } from '../lib/tail'
+import { createVoyage, fly, settle, steer } from '../lib/voyage'
 
 const NO_INTERESTS: Record<string, number> = {}
 
-// Voyages between answers: a spring that takes about three seconds to settle,
-// with a cruising-speed limit so long jumps don't streak across the sky.
+// Before the first move (only the mood answered), the comet springs to the origin.
 const VOYAGE_SMOOTH_TIME = 0.9
 const VOYAGE_MAX_SPEED = 14
+// While flying the journey curve, a light spring smooths over the curve
+// reshaping as answers arrive, so the comet never jumps.
+const FLIGHT_SMOOTH_TIME = 0.18
+// Below this speed (world units/s) the comet is at rest and keeps its heading.
+const MOVING = 0.25
 // When a replay or scrub moves the comet somewhere new, it glides there this fast.
 const CATCH_UP_SMOOTH_TIME = 0.18
 // A pinned position that moves further than this in one frame is a jump to glide over.
@@ -32,8 +38,12 @@ interface Props {
   history: CometState[]
   isLoading: boolean
   demo: boolean
-  /** Exact position to hold (replays and scrubbing); otherwise the comet voyages to its state. */
-  position?: THREE.Vector3
+  /** The journey curve the comet flies along (null before it first moves). */
+  path: JourneyPath | null
+  /** Curve parameter to hold while replaying or scrubbing; null when live. */
+  replayT: number | null
+  /** Written every frame: how far along the curve the comet is (0–1), for the tail. */
+  progress: { t: number }
   /** Hide the hover tooltip (e.g. while a memory card is open). */
   hideTooltip?: boolean
   /** Show exact numbers in the tooltip (chart mode) instead of plain language. */
@@ -45,7 +55,10 @@ export interface CometHandle {
   look: CometLook
 }
 
-export const Comet = forwardRef<CometHandle, Props>(function Comet({ state, history, isLoading, demo, position, hideTooltip = false, exact = false }, ref) {
+export const Comet = forwardRef<CometHandle, Props>(function Comet(
+  { state, history, isLoading, demo, path, replayT, progress, hideTooltip = false, exact = false },
+  ref,
+) {
   const [hovered, setHovered] = useState(false)
   const group = useRef<THREE.Group>(null)
   const look = useRef(createLook())
@@ -55,7 +68,11 @@ export const Comet = forwardRef<CometHandle, Props>(function Comet({ state, hist
   const previous = useMemo(() => new THREE.Vector3(), [])
   const targetHeading = useMemo(() => new THREE.Vector3(0, 1, 0), [])
   // Spring velocity, and whether the comet is pinned to (or gliding onto) a replay position.
-  const motion = useRef({ velocity: new THREE.Vector3(), pinned: false, catching: false, lastPin: new THREE.Vector3() })
+  const motion = useRef({ velocity: new THREE.Vector3(), pinned: false, catching: false, lastPin: new THREE.Vector3(), headed: false })
+  const voyage = useRef(createVoyage())
+  // A journey restored on load starts at its end rather than flying it again.
+  const restored = useRef(path !== null)
+  const pinPos = useMemo(() => new THREE.Vector3(), [])
   const historyHeading = useMemo(() => headingFrom(history), [history])
 
   useImperativeHandle(ref, () => ({
@@ -80,10 +97,19 @@ export const Comet = forwardRef<CometHandle, Props>(function Comet({ state, hist
       easing.damp3(g.position, targetPos, 1.2, delta)
       easing.damp(l, 'energy', 1, 0.5, delta)
       easing.damp(l, 'spread', 0.6, 0.5, delta)
+      // No journey (yet, or after starting a new comet): the next flight starts at the origin.
+      settle(voyage.current, 0)
+      progress.t = 0
     } else {
-      toWorld(state.personality, targetPos)
       emotionColor(state.emotion, targetColor)
-      if (position) {
+      const v = voyage.current
+      const points = path?.points.length ?? 0
+      // The journey can only shrink if it was replaced; start its flight from the beginning.
+      if (v.u > Math.max(points - 1, 0)) settle(v, 0)
+      const position = path && replayT !== null ? path.curve.getPoint(replayT, pinPos) : null
+      if (position && path) {
+        settle(v, replayT! * (points - 1))
+        progress.t = replayT!
         // Replays and scrubbing: sit exactly on the journey curve, gliding
         // onto it first when the replay starts or the playhead jumps.
         if (!m.pinned || position.distanceTo(m.lastPin) > PIN_JUMP) m.catching = true
@@ -96,15 +122,31 @@ export const Comet = forwardRef<CometHandle, Props>(function Comet({ state, hist
         } else {
           g.position.copy(position)
         }
-      } else {
-        // Each answer redirects the voyage. The velocity carries over, so a
-        // quick run of answers curves the comet onwards rather than stopping
-        // it dead and restarting at each one.
+      } else if (path) {
+        // Each answer sends the comet off along the journey curve: a winding
+        // route through random detours, at a random cruising speed, with a
+        // slow drift. An answer mid-flight carries straight on into the next leg.
         m.pinned = false
         m.catching = false
+        if (restored.current) {
+          settle(v, points - 1)
+          path.curve.getPoint(1, g.position)
+        }
+        steer(v, path.curve, points, t)
+        fly(v, path.curve, points, t, targetPos)
+        springStep(g.position, m.velocity, targetPos, FLIGHT_SMOOTH_TIME, delta)
+        sprung = true
+        progress.t = v.u / (points - 1)
+      } else {
+        // Nothing to fly yet (only the mood answered): settle at the origin.
+        m.pinned = false
+        m.catching = false
+        toWorld(state.personality, targetPos)
         springStep(g.position, m.velocity, targetPos, VOYAGE_SMOOTH_TIME, delta, VOYAGE_MAX_SPEED)
         sprung = true
+        progress.t = 0
       }
+      restored.current = false
       easing.damp(l, 'energy', energyGlow(state.emotion.lightness), 0.6, delta)
       easing.damp(l, 'spread', meanUncertainty(state.uncertainty), 0.6, delta)
     }
@@ -114,10 +156,12 @@ export const Comet = forwardRef<CometHandle, Props>(function Comet({ state, hist
     // Keep the spring's velocity in step with motion it didn't drive, so the
     // hand-over from demo wandering or a replay is seamless.
     if (!sprung) m.velocity.copy(l.velocity)
-    // Heading: the last move between observations, or the live motion in demo mode.
-    // While replaying, the heading follows the curve's direction instead.
-    if (historyHeading && !demo && !position) targetHeading.copy(historyHeading)
-    else if (l.velocity.lengthSq() > 1e-4) targetHeading.copy(l.velocity).normalize()
+    // Heading: the direction of travel, kept while at rest. A comet restored at
+    // rest takes the direction of its last move.
+    if (l.velocity.length() > MOVING) {
+      targetHeading.copy(l.velocity).normalize()
+      m.headed = true
+    } else if (!m.headed && historyHeading && !demo) targetHeading.copy(historyHeading)
     easing.damp3(l.heading, targetHeading, 0.4, delta)
     if (l.heading.lengthSq() > 1e-8) l.heading.normalize()
 

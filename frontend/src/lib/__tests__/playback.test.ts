@@ -77,7 +77,7 @@ describe('replay motion', () => {
     // Sharp 3D turns (90°+ between legs), plus a step that doesn't move.
     const zigzag = [p(0.4, 0.1, 0), p(0.3, 0.5, 0.2), p(-0.2, 0.3, 0.5), p(-0.2, 0.3, 0.5), p(-0.1, -0.3, 0.1), p(0.4, -0.2, -0.3)]
     const { curve } = journeyPath(zigzag)!
-    const steps = 400
+    const steps = 1500
     const points = Array.from({ length: steps + 1 }, (_, i) => curve.getPoint(curve.getUtoTmapping(i / steps, 0)))
     const lengths = points.slice(1).map((p, i) => p.distanceTo(points[i]))
     const mean = lengths.reduce((a, b) => a + b, 0) / lengths.length
@@ -94,22 +94,49 @@ describe('replay motion', () => {
   })
 })
 
-describe('liveControlPoints', () => {
-  it('runs from the origin through past places to the head, skipping repeats', async () => {
-    const THREE = await import('three')
-    const { journeyPath, liveControlPoints } = await import('../playback')
-    const path = journeyPath([at(0, 60), at(0.5, 60), at(0.5, 60), at(-0.2, 60)])!
-    const head = new THREE.Vector3(9, 9, 9)
-    const pts = liveControlPoints(path, head)
-    expect(pts).toHaveLength(3)
-    expect(pts[0].length()).toBe(0)
-    expect(pts[2].equals(head)).toBe(true)
-    expect(path.states).toHaveLength(2)
+describe('journey detours', () => {
+  const axisMoves = [at(0.2, 60), at(0.4, 60), at(0.6, 60)]
+  const ids = ['a1', 'b2', 'c3']
+
+  it('replays the same route for the same answers', async () => {
+    const { journeyPath } = await import('../playback')
+    const a = journeyPath(axisMoves, ids)!
+    const b = journeyPath(axisMoves, ids)!
+    expect(a.points.map((p) => p.toArray())).toEqual(b.points.map((p) => p.toArray()))
+    const other = journeyPath(axisMoves, ['x', 'y', 'z'])!
+    expect(other.points[1].distanceTo(a.points[1])).toBeGreaterThan(0.1)
   })
 
-  it('merges the place the head is still sitting on', async () => {
-    const { journeyPath, liveControlPoints } = await import('../playback')
-    const path = journeyPath([at(0.5, 60), at(-0.5, 60)])!
-    expect(liveControlPoints(path, path.points[1].clone())).toHaveLength(2)
+  it('wanders off the axis even when every answer moves along it', async () => {
+    const THREE = await import('three')
+    const { journeyPath } = await import('../playback')
+    const { curve } = journeyPath(axisMoves, ids)!
+    // How far the route strays from the x axis it nominally travels along.
+    const strays = Array.from({ length: 200 }, (_, i) => {
+      const p = curve.getPoint(i / 199)
+      return new THREE.Vector2(p.y, p.z).length()
+    })
+    expect(Math.max(...strays)).toBeGreaterThan(1.5)
+  })
+
+  it('sends each move off in its own direction', async () => {
+    const THREE = await import('three')
+    const { journeyPath } = await import('../playback')
+    const { points } = journeyPath(axisMoves, ids)!
+    // One detour per short move: points are origin, d1, A1, d2, A2, d3, A3.
+    const sideways = (i: number) => new THREE.Vector3(0, points[i].y, points[i].z).normalize()
+    const angles = [sideways(1).angleTo(sideways(3)), sideways(3).angleTo(sideways(5))]
+    expect(Math.max(...angles)).toBeGreaterThan(0.3)
+  })
+
+  it('detours a long move twice, keeping every detour near the move', async () => {
+    const THREE = await import('three')
+    const { detourPoints } = await import('../playback')
+    const { mulberry32 } = await import('../sky')
+    const from = new THREE.Vector3()
+    const to = new THREE.Vector3(12, 0, 0)
+    const points = detourPoints(from, to, mulberry32(7))
+    expect(points).toHaveLength(2)
+    for (const p of points) expect(p.distanceTo(from.clone().lerp(to, 0.5))).toBeLessThan(12)
   })
 })

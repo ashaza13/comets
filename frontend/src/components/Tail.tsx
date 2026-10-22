@@ -6,7 +6,7 @@ import fragmentShader from '../shaders/particle.frag'
 import vertexShader from '../shaders/dustTail.vert'
 import { packCurve, type CometLook } from '../lib/comet'
 import { mulberry32 } from '../lib/sky'
-import { journeyPath, liveControlPoints, type JourneyPath } from '../lib/playback'
+import type { JourneyPath } from '../lib/playback'
 import { tailTexture } from '../lib/tail'
 import { useReducedMotion } from '../hooks/useReducedMotion'
 import type { CometState } from '../lib/schema'
@@ -37,23 +37,24 @@ interface Props {
   head: RefObject<THREE.Group | null>
   /** Live comet appearance: colour for the motion trail, uncertainty for dust scatter. */
   look: RefObject<CometLook | null>
+  /** The journey curve (null before the comet first moves, and in demo or debug mode). */
+  path: JourneyPath | null
   /**
-   * While replaying: the full journey path and how far along it the comet is
-   * (curve parameter t). The tail is then drawn as the curve's first t, so it
-   * grows smoothly instead of re-bending at each answer.
+   * How far along the curve the comet is (curve parameter t), written by the
+   * comet every frame. The tail is the curve's first t, the route actually
+   * flown, so it grows smoothly instead of re-bending at each answer.
    */
-  journey?: { path: JourneyPath; t: number } | null
+  progress: { t: number }
 }
 
-// Below this curve parameter the replayed tail is too short to draw.
-const MIN_REPLAY_T = 1e-4
+// Below this curve parameter the tail is too short to draw.
+const MIN_T = 1e-4
+// The last share of the tail bends onto the comet, which drifts a little off the curve.
+const HEAD_BLEND = 0.12
 
-export function Tail({ history, head, look, journey = null }: Props) {
-  // Live tail follows the same path of distinct places as replays do.
-  const livePath = useMemo(() => (journey ? null : journeyPath(history)), [journey, history])
-  const path = journey?.path ?? livePath
+export function Tail({ history, head, look, path, progress }: Props) {
   const colorStates = useMemo(() => path?.states ?? [], [path])
-  const recent = !journey && history.length === 0
+  const recent = path === null && history.length === 0
   const lineMesh = useRef<THREE.Mesh>(null)
   const dustPoints = useRef<THREE.Points>(null)
   const geometry = useRef<MeshLineGeometry>(null)
@@ -63,6 +64,7 @@ export function Tail({ history, head, look, journey = null }: Props) {
   const sampled = useRef<THREE.Vector3[]>([])
   const pixelRatio = useThree((s) => s.viewport.dpr)
   const reducedMotion = useReducedMotion()
+  const offset = useMemo(() => new THREE.Vector3(), [])
 
   const dust = useMemo(() => {
     const rand = mulberry32(17)
@@ -109,13 +111,18 @@ export function Tail({ history, head, look, journey = null }: Props) {
     if (dustPoints.current) dustPoints.current.visible = drawn
     if (!drawn) return
 
-    if (journey) {
+    if (path) {
       sampled.current = []
-      const t = Math.max(journey.t, MIN_REPLAY_T)
-      points = Array.from({ length: SAMPLES + 1 }, (_, i) => journey.path.curve.getPoint((i / SAMPLES) * t))
+      const t = Math.max(progress.t, MIN_T)
+      points = Array.from({ length: SAMPLES + 1 }, (_, i) => path.curve.getPoint((i / SAMPLES) * t))
+      const gap = offset.subVectors(headPos, points[SAMPLES])
+      for (let i = 0; i <= SAMPLES; i++) {
+        const w = THREE.MathUtils.smoothstep(i / SAMPLES, 1 - HEAD_BLEND, 1)
+        if (w > 0) points[i].addScaledVector(gap, w)
+      }
       colorSpan = t
       material.current.color.set('white')
-    } else if (recent) {
+    } else {
       // No observations to draw: show the recent motion path behind the head.
       const trail = sampled.current
       if (trail.length === 0 || trail[trail.length - 1].distanceTo(headPos) > 0.004) {
@@ -124,10 +131,6 @@ export function Tail({ history, head, look, journey = null }: Props) {
       }
       points = trail.length > 1 ? trail : [headPos.clone(), headPos.clone()]
       material.current.color.copy(l.color)
-    } else {
-      sampled.current = []
-      points = new THREE.CatmullRomCurve3(liveControlPoints(path!, headPos), false, 'centripetal').getPoints(SAMPLES)
-      material.current.color.set('white')
     }
     geometry.current.setPoints(points, taper)
     material.current.repeat.set(colorSpan, 1)

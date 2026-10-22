@@ -68,8 +68,14 @@ export function Scene({ entries, debugState, isLoading, chartMode, revealed, sho
   const members = useConstellation((s) => s.members)
   const selfId = useConstellation((s) => s.membership?.memberId ?? null)
   const friends = useMemo(() => members.filter((m) => m.id !== selfId), [members, selfId])
-  const mapFrame = useMemo(() => journeyBounds(fullHistory, friends.map((f) => f.personality)), [fullHistory, friends])
-  const path = useMemo(() => journeyPath(fullHistory), [fullHistory])
+  // Seeded by each answer's id, so the journey's detours are the same on every replay.
+  const path = useMemo(() => journeyPath(fullHistory, entries.map((e) => e.id)), [fullHistory, entries])
+  const mapFrame = useMemo(
+    () => journeyBounds(fullHistory, friends.map((f) => f.personality), path?.points),
+    [fullHistory, friends, path],
+  )
+  // How far along the path the comet is: written by the comet, read by the tail.
+  const progress = useMemo(() => ({ t: 0 }), [])
   const finalState = fullHistory.at(-1)
   const finalPosition = useMemo(() => (finalState ? toWorld(finalState.personality) : null), [finalState])
 
@@ -126,7 +132,6 @@ export function Scene({ entries, debugState, isLoading, chartMode, revealed, sho
   const replaying = playhead !== null
   // While replaying or scrubbing, the comet sits exactly on the journey curve.
   const replayT = replaying && path ? playheadToT(path, playhead) : null
-  const cometPosition = useMemo(() => (path && replayT !== null ? path.curve.getPoint(replayT) : undefined), [path, replayT])
   const state = debugState ?? history.at(-1) ?? (replaying ? INITIAL_STATE : null)
   const demo = state === null
   // The axes appear once the reveal replay has finished; later scrubbing keeps them.
@@ -156,7 +161,7 @@ export function Scene({ entries, debugState, isLoading, chartMode, revealed, sho
         <Starfield />
         <SpaceDust />
         <Constellations chartMode={chartMode} revealed={mapShown} />
-        <Tail history={history} head={head} look={look} journey={path && replayT !== null ? { path, t: replayT } : null} />
+        <Tail history={history} head={head} look={look} path={debugState ? null : path} progress={progress} />
         <FriendStars friends={friends} visible={mapShown && !debugState} />
         <MemoryStars entries={memories} total={total} interactive={mapShown} onHoverChange={setMemoryOpen} />
         <Comet
@@ -165,7 +170,9 @@ export function Scene({ entries, debugState, isLoading, chartMode, revealed, sho
           history={history}
           isLoading={isLoading}
           demo={demo}
-          position={cometPosition}
+          path={debugState ? null : path}
+          replayT={replayT}
+          progress={progress}
           hideTooltip={memoryOpen && mapShown}
           exact={chartMode && mapShown}
         />

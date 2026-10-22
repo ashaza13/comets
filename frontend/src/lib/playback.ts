@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { INITIAL_STATE, type CometState } from './schema'
+import { mulberry32 } from './sky'
 import { toWorld } from './tail'
 
 /**
@@ -56,38 +57,105 @@ export function historyAt(history: CometState[], playhead: number | null): Comet
 
 // Points closer than this are treated as the same place on the curve.
 const SAME_PLACE = 1e-3
+// Even a small move wanders at least this far (world units) off the straight line.
+const DETOUR_MIN = 2.5
+// Moves longer than this take two detours rather than one.
+const LONG_MOVE = 8
+
+/** A stable 32-bit seed from an answer's id, so its detours replay identically. */
+export function seedFrom(id: string): number {
+  let h = 0x811c9dc5
+  for (let i = 0; i < id.length; i++) h = Math.imul(h ^ id.charCodeAt(i), 0x01000193)
+  return h >>> 0
+}
+
+// The route may turn at most this sharply (cosine of ~100°) where one move hands
+// over to the next, so it sweeps on rather than doubling back on itself.
+const MIN_TURN_COS = -0.17
+const DETOUR_TRIES = 8
 
 /**
- * The journey as one smooth curve through the origin and every distinct
- * position. Answers that didn't move the comet (mood, topics, skipped statements)
- * share their predecessor's place: repeating a point would make the curve
- * stall and jerk there. `knots[i]` is the curve parameter t of control point i
- * (0 = origin, i = after answer i), so the playhead can be mapped both ways.
+ * Waypoints for one move, so the comet wanders rather than sliding along an
+ * axis: each sits part-way along the move, pushed off in a random direction
+ * that is mostly sideways to it, by a random share of the move's length.
+ * Given the direction the comet arrives from, the first waypoint is picked so
+ * the route carries on rather than doubling back.
+ */
+export function detourPoints(
+  from: THREE.Vector3,
+  to: THREE.Vector3,
+  rand: () => number,
+  arriving: THREE.Vector3 | null = null,
+): THREE.Vector3[] {
+  const distance = from.distanceTo(to)
+  const count = distance > LONG_MOVE ? 2 : 1
+  const candidates = (k: number) =>
+    Array.from({ length: k === 0 && arriving ? DETOUR_TRIES : 1 }, () => detour(from, to, k, count, distance, rand))
+  return Array.from({ length: count }, (_, k) => {
+    const options = candidates(k)
+    if (!arriving || k > 0) return options[0]
+    const turn = (p: THREE.Vector3) => p.clone().sub(from).normalize().dot(arriving)
+    return options.find((p) => turn(p) > MIN_TURN_COS) ?? options.reduce((a, b) => (turn(b) > turn(a) ? b : a))
+  })
+}
+
+/** One waypoint: part-way along the move, pushed off mostly sideways to it. */
+function detour(from: THREE.Vector3, to: THREE.Vector3, k: number, count: number, distance: number, rand: () => number) {
+  const along = to.clone().sub(from).normalize()
+  const z = rand() * 2 - 1
+  const phi = rand() * Math.PI * 2
+  const r = Math.sqrt(1 - z * z)
+  const offset = new THREE.Vector3(r * Math.cos(phi), r * Math.sin(phi), z)
+  offset.addScaledVector(along, -0.8 * offset.dot(along))
+  if (offset.lengthSq() < 1e-6) offset.set(-along.y, along.x, along.z)
+  offset.normalize().multiplyScalar((0.35 + 0.45 * rand()) * Math.max(distance, DETOUR_MIN))
+  const at = (k + 0.5 + (rand() - 0.5) * 0.5) / count
+  return from.clone().lerp(to, at).add(offset)
+}
+
+/**
+ * The journey as one smooth curve from the origin through every place the
+ * comet went, with random detours between answers (seeded by each answer's id,
+ * so a replay retraces the same route). Answers that didn't move the comet
+ * (mood, topics, skipped statements) share their predecessor's place.
+ * `knots[i]` is the curve parameter t of answer i's place (0 = origin), so the
+ * playhead can be mapped both ways.
  */
 export interface JourneyPath {
   curve: THREE.CatmullRomCurve3
   knots: number[]
-  /** The distinct places, origin first. */
+  /** Every control point, origin first: answers' places and the detours between them. */
   points: THREE.Vector3[]
-  /** State at each distinct place after the origin (the last answer there), for tail colours. */
+  /** State for each control point after the origin (the answer it leads to), for tail colours. */
   states: CometState[]
 }
 
-export function journeyPath(history: CometState[]): JourneyPath | null {
-  const all = [new THREE.Vector3(), ...history.map((s) => toWorld(s.personality))]
-  const distinct: THREE.Vector3[] = []
+export function journeyPath(history: CometState[], ids: string[] = []): JourneyPath | null {
+  const points = [new THREE.Vector3()]
   const states: CometState[] = []
-  const index = all.map((p, i) => {
-    if (distinct.length === 0 || distinct[distinct.length - 1].distanceTo(p) > SAME_PLACE) distinct.push(p)
-    const j = distinct.length - 1
-    if (i > 0 && j > 0) states[j - 1] = history[i - 1]
-    return j
+  const places = [0]
+  history.forEach((state, i) => {
+    const target = toWorld(state.personality)
+    const from = points[points.length - 1]
+    if (from.distanceTo(target) > SAME_PLACE) {
+      const arriving = points.length > 1 ? from.clone().sub(points[points.length - 2]).normalize() : null
+      for (const waypoint of detourPoints(from, target, mulberry32(seedFrom(ids[i] ?? `answer-${i}`)), arriving)) {
+        points.push(waypoint)
+        states.push(state)
+      }
+      points.push(target)
+      states.push(state)
+    } else if (states.length > 0) {
+      // The last answer at a place sets its colour.
+      states[states.length - 1] = state
+    }
+    places.push(points.length - 1)
   })
   // Nowhere to travel: every answer so far left the comet where it started.
-  if (distinct.length < 2) return null
-  const curve = new THREE.CatmullRomCurve3(distinct, false, 'centripetal')
-  curve.arcLengthDivisions = 600
-  return { curve, knots: index.map((i) => i / (distinct.length - 1)), points: distinct, states }
+  if (points.length < 2) return null
+  const curve = new THREE.CatmullRomCurve3(points, false, 'centripetal')
+  curve.arcLengthDivisions = 6000
+  return { curve, knots: places.map((i) => i / (points.length - 1)), points, states }
 }
 
 /** Curve parameter for a playhead (clamped to the journey). */
@@ -114,19 +182,4 @@ export function tToPlayhead(path: JourneyPath, t: number): number {
 /** Smooth start and finish for the replay, constant speed in between. */
 export function easeReplay(x: number): number {
   return x < 0.5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2
-}
-
-// Past points closer than this to the head are merged into it.
-const MERGE_DISTANCE = 0.05
-
-/**
- * Control points for the live tail: every distinct place except the one the
- * comet is heading for, then the comet itself. Right after an answer lands the
- * comet is still sitting on the previous place; a near-duplicate control point
- * there would kink the tail's end, so it is merged into the head.
- */
-export function liveControlPoints(path: JourneyPath, head: THREE.Vector3): THREE.Vector3[] {
-  const past = path.points.slice(0, -1).map((p) => p.clone())
-  while (past.length > 1 && past[past.length - 1].distanceTo(head) < MERGE_DISTANCE) past.pop()
-  return [...past, head.clone()]
 }

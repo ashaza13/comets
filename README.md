@@ -154,7 +154,10 @@ Taps are scored in the browser with a TypeScript port of the backend's update ma
 take an optional **say more**, typed or dictated, which Claude reads on the backend.
 
 While you answer, the camera travels with the comet and the axes stay hidden; each answer fires a
-flare and the comet glides to its new position, leaving a memory star behind. After the last step
+flare and the comet sets off for its new position, leaving a memory star behind. It doesn't go in a
+straight line: each move takes a winding route through one or two random detours (seeded by the
+answer, so replays retrace it exactly), flown at a random cruising speed with a slow drift, and an
+answer mid-flight carries straight on into the next leg. After the last step
 the journey replays from the start with the camera riding along, then it pulls back to the comet's
 final place and the axes fade in around it. Dashed lines drop from the comet to each axis, and a
 "where you landed" card reads out each dimension on a scale, with a band for how sure the estimate
