@@ -153,14 +153,14 @@ export const Comet = forwardRef<CometHandle, Props>(function Comet({ state, hist
                   <div key={a.key} className="nt-row">
                     {exact ? (
                       <>
-                        <span style={{ color: a.color }}>{v >= 0 ? a.positive : a.negative}</span>
+                        <span className="axis-reading">{v >= 0 ? a.positive : a.negative}</span>
                         <span>
                           {Math.abs(v).toFixed(2)}
                           <span className="dim"> ±{Math.sqrt(state.uncertainty[a.key]).toFixed(2)}</span>
                         </span>
                       </>
                     ) : (
-                      <span style={{ color: a.color }}>{certaintyNote(state.uncertainty[a.key]) === 'no read yet' ? '—' : describeAxis(a, v)}</span>
+                      <span className="axis-reading">{certaintyNote(state.uncertainty[a.key]) === 'no read yet' ? '—' : describeAxis(a, v)}</span>
                     )}
                   </div>
                 )

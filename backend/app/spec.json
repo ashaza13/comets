@@ -5,24 +5,21 @@
       "name": "extraversion",
       "negative": "introvert",
       "positive": "extrovert",
-      "description": "how much you seek out people and attention",
-      "color": "#de7f66"
+      "description": "how much you seek out people and attention"
     },
     {
       "key": "y",
       "name": "intellect",
       "negative": "concrete",
       "positive": "abstract",
-      "description": "how drawn you are to ideas and complex problems",
-      "color": "#93c08c"
+      "description": "how drawn you are to ideas and complex problems"
     },
     {
       "key": "z",
       "name": "imagination",
       "negative": "practical",
       "positive": "imaginative",
-      "description": "how much you live in images, art and daydreams",
-      "color": "#80a7da"
+      "description": "how much you live in images, art and daydreams"
     }
   ],
   "domains": [

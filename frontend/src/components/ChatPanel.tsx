@@ -18,7 +18,7 @@ function SignalReadout({ observation, exact }: { observation: Observation; exact
           <span className="dim">reads as</span>
           <span>
             {axes.map((a) => (
-              <span key={a.key} style={{ color: a.color, marginLeft: 6 }}>
+              <span key={a.key} className="axis-reading">
                 {exact ? `${a.key} ${signed(p[a.key]!)}` : describeAxis(a, p[a.key]!)}
               </span>
             ))}

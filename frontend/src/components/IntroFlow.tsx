@@ -6,7 +6,7 @@ interface Slide {
   eyebrow: string | null
   title: string | null
   body: string | null
-  axes: { color: string; label: string; desc: string }[] | null
+  axes: { label: string; desc: string }[] | null
   cta: string | null
   autoAdvance: number | null
 }
@@ -32,7 +32,7 @@ const SLIDES: Slide[] = [
     eyebrow: 'three axes',
     title: null,
     body: null,
-    axes: AXES.map((a) => ({ color: a.color, label: `${a.negative} ↔ ${a.positive}`, desc: a.description })),
+    axes: AXES.map((a) => ({ label: `${a.negative} ↔ ${a.positive}`, desc: a.description })),
     cta: null,
     autoAdvance: 4800,
   },
@@ -112,7 +112,7 @@ export function IntroFlow({ exiting, onDone }: Props) {
             <div className="intro-axes">
               {slide.axes.map((ax) => (
                 <div key={ax.label} className="intro-axis-row">
-                  <span className="intro-axis-label" style={{ color: ax.color }}>
+                  <span className="intro-axis-label">
                     {ax.label}
                   </span>
                   <span className="intro-axis-desc">{ax.desc}</span>

@@ -76,7 +76,7 @@ export function MemoryStars({ entries, total, interactive, onHoverChange }: Prop
                     {AXES.filter((a) => entry.observation.personality[a.key] !== null).map((a) => {
                       const v = entry.observation.personality[a.key]!
                       return (
-                        <span key={a.key} style={{ color: a.color }}>
+                        <span key={a.key}>
                           {v >= 0 ? a.positive : a.negative}
                         </span>
                       )

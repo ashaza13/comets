@@ -4,7 +4,7 @@ import { useFrame } from '@react-three/fiber'
 import { easing } from 'maath'
 import * as THREE from 'three'
 import fontUrl from '@fontsource/instrument-sans/files/instrument-sans-latin-500-normal.woff?url'
-import { AXES, SPACE_SCALE, type Axis, type Vec3Tuple } from '../lib/spec'
+import { AXES, GRID_COLOR, SPACE_SCALE, type Axis, type Vec3Tuple } from '../lib/spec'
 import { axisLabelVisibility } from '../lib/sky'
 import { createGlowTexture } from '../lib/textures'
 
@@ -51,7 +51,7 @@ interface FadeProps {
 
 function ConstellationAxis({ axis, chartMode, revealed, glow }: FadeProps & { axis: Axis; glow: THREE.Texture }) {
   const dir = UNIT[axis.key]
-  const dots = useMemo(() => axisDots(dir, axis.color), [dir, axis.color])
+  const dots = useMemo(() => axisDots(dir, GRID_COLOR), [dir])
   const dotMaterial = useRef<THREE.PointsMaterial>(null)
   const line = useRef<Line2>(null)
   const labels = useRef<(TextMesh | null)[]>([])
@@ -107,17 +107,17 @@ function ConstellationAxis({ axis, chartMode, revealed, glow }: FadeProps & { ax
           blending={THREE.AdditiveBlending}
         />
       </points>
-      <Line ref={line} points={[end(-1, EXTENT), end(1, EXTENT)]} color={axis.color} lineWidth={0.9} transparent opacity={0} />
+      <Line ref={line} points={[end(-1, EXTENT), end(1, EXTENT)]} color={GRID_COLOR} lineWidth={0.9} transparent opacity={0} />
       {([-1, 1] as const).map((sign, i) => (
         <group key={sign} position={end(sign, EXTENT)}>
           {/* A small star marks each pole of the constellation (screen-sized). */}
-          <sprite scale={0.035}>
+          <sprite scale={0.026}>
             <spriteMaterial
               ref={(m) => {
                 poles.current[i] = m
               }}
               map={glow}
-              color={axis.color}
+              color={GRID_COLOR}
               sizeAttenuation={false}
               transparent
               depthWrite={false}
@@ -136,7 +136,7 @@ function ConstellationAxis({ axis, chartMode, revealed, glow }: FadeProps & { ax
               }}
               font={fontUrl}
               fontSize={1}
-              color={axis.color}
+              color={GRID_COLOR}
               anchorX="center"
               anchorY="middle"
               letterSpacing={0.01}
@@ -186,7 +186,7 @@ function Rings({ chartMode, revealed }: FadeProps) {
           }}
           points={circle}
           rotation={rotation}
-          color="#4a4a8a"
+          color={GRID_COLOR}
           lineWidth={0.6}
           transparent
           opacity={0}

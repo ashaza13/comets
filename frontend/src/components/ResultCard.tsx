@@ -46,7 +46,7 @@ export function ResultCard({ state, exact, onReplay }: Props) {
         const v = state.personality[a.key]
         const sd = Math.sqrt(state.uncertainty[a.key])
         return (
-          <div key={a.key} className="result-axis" style={{ ['--axis' as string]: a.color }}>
+          <div key={a.key} className="result-axis">
             <div className="result-axis-head">
               <span className="result-axis-name">{a.name}</span>
               <span className="dim">

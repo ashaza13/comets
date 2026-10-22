@@ -203,6 +203,9 @@ button { font-family: inherit; }
   align-items: baseline;
 }
 
+.axis-reading { color: var(--text); }
+.readout-row .axis-reading { margin-left: 6px; }
+
 .readout-interests { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
 
 .readout-reasoning {
@@ -442,6 +445,7 @@ button { font-family: inherit; }
   font-weight: 600;
   letter-spacing: -0.02em;
   line-height: 1.2;
+  color: var(--text);
 }
 
 .intro-axis-desc { font-size: 13.5px; color: var(--text-3); }
@@ -877,7 +881,7 @@ button { font-family: inherit; }
 
 .result-close:hover { color: var(--text); }
 
-.result-axis { display: flex; flex-direction: column; gap: 6px; }
+.result-axis { display: flex; flex-direction: column; gap: 6px; --axis: var(--text); }
 
 .result-axis-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
 
@@ -889,12 +893,6 @@ button { font-family: inherit; }
   color: var(--text);
 }
 
-.result-axis-name::before {
-  content: '';
-  width: 10px;
-  height: 2px;
-  background: var(--axis);
-}
 
 .result-desc { font-size: 11.5px; color: var(--text-3); }
 

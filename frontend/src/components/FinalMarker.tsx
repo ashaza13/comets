@@ -3,7 +3,7 @@ import { Line } from '@react-three/drei'
 import { useFrame } from '@react-three/fiber'
 import { easing } from 'maath'
 import * as THREE from 'three'
-import { AXES, type Vec3Tuple } from '../lib/spec'
+import { AXES, GRID_COLOR, type Vec3Tuple } from '../lib/spec'
 import { createGlowTexture } from '../lib/textures'
 
 type Line2 = ComponentRef<typeof Line>
@@ -52,7 +52,7 @@ export function FinalMarker({ position, shown }: Props) {
               lines.current[i] = l
             }}
             points={[position.toArray() as Vec3Tuple, foot]}
-            color={axis.color}
+            color={GRID_COLOR}
             lineWidth={1.2}
             dashed
             dashSize={0.6}
@@ -67,7 +67,7 @@ export function FinalMarker({ position, shown }: Props) {
                 feet.current[i] = m
               }}
               map={glow}
-              color={axis.color}
+              color={GRID_COLOR}
               sizeAttenuation={false}
               transparent
               opacity={0}

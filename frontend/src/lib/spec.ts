@@ -10,8 +10,10 @@ export interface Axis {
   negative: string
   positive: string
   description: string
-  color: string
 }
+
+/** The map's axes are drawn in one pale starlight, like a printed star chart. */
+export const GRID_COLOR = '#c8cfdc'
 
 export interface Domain {
   id: string
