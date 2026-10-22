@@ -62,11 +62,14 @@ Each signal type maps to a distinct visual channel, keeping them perceptually se
 
 The three spatial axes correspond to the personality dimensions that capture the most variance while remaining close to orthogonal:
 
-- **X-axis** — Social orientation (introvert ↔ extrovert)
-- **Y-axis** — Cognitive style (concrete/pragmatic ↔ abstract/philosophical)
-- **Z-axis** — Engagement mode (analytical ↔ creative/expressive)
+- **X-axis** — Extraversion (introvert ↔ extrovert)
+- **Y-axis** — Intellect (concrete ↔ abstract: drawn to ideas and complex problems)
+- **Z-axis** — Imagination (practical ↔ imaginative: images, art and daydreams)
 
-Someone can be both deeply analytical and deeply creative — that combination places them in a specific, valid region of the space rather than forcing a choice.
+These follow established personality research: x is Big Five Extraversion, and y and z are the two
+sides of Openness/Intellect that DeYoung, Quilty and Peterson (2007) separate into the Intellect and
+Openness aspects. They correlate, but someone can love abstract problems without caring for art, or
+the reverse, and that combination places them in a distinct region of the space.
 
 #### Color Space (Emotion → HSL)
 
@@ -109,12 +112,115 @@ The prompt flow is ordered to build trust and extract progressively richer signa
 
 | Layer | Technology |
 |---|---|
-| 3D rendering | [Three.js](https://threejs.org/) with custom `ShaderMaterial` |
-| Mesh deformation | Vertex displacement along normals (UV sphere, ~64×64 subdivisions) |
-| Color encoding | Per-vertex color data driven by emotion signal deltas |
-| UI shell | React |
-| NLP extraction | Anthropic Claude API (structured JSON output) |
-| State management | Accumulated signal history stored per session; delta updates on each input |
+| 3D rendering | [Three.js](https://threejs.org/) via React Three Fiber + drei |
+| Sky | Procedural nebula (simplex-noise fbm baked once into a cube map), twinkling starfield with a galactic band, drifting dust; custom GLSL via `vite-plugin-glsl` |
+| Post-processing | `@react-three/postprocessing` (bloom, vignette, grain, AgX tone mapping) |
+| Comet tail | `meshline` ribbon through every observation, coloured per message |
+| Motion & colour | `maath` damping; `culori` OKLCH so emotion hues share one perceived brightness |
+| UI shell | React 19, Vite |
+| Client state | `zustand` persisted to `localStorage`, validated with `zod` |
+| NLP extraction | Anthropic Claude API, structured output parsed into Pydantic models |
+| API | FastAPI, stateless: the client sends its comet with each message |
+| Shared vocabulary | `backend/app/spec.json` defines axes, domains and prompts for both sides |
+
+### How the comet encodes a person
+
+| Comet part | Signal |
+|---|---|
+| Nucleus position | Personality (x/y/z) |
+| Coma colour | Emotion hue and intensity |
+| Coma and nucleus brightness, coma size | Energy |
+| Coma churn and spread | Uncertainty: turbulent at first, calming as evidence builds |
+| Particle jets | Depth per interest domain, streaming along that domain's direction |
+| Dust tail | The path through every observation so far, in the colour of each moment, scattering as it ages |
+| Ion tail | The current heading: a straight plasma streak pointing back along the latest move |
+
+### The journey
+
+About a minute of taps, no typing required:
+
+1. **Mood wheel**: tap a colour; the angle is the kind of feeling, the distance from the centre how
+   strongly you feel it. A slider sets energy.
+2. **Statements** (12): rate how well each describes you, from *very inaccurate* to *very accurate*.
+   They are validated, public-domain items from the [International Personality Item Pool](https://ipip.ori.org),
+   four per axis with two keyed each way, so agreeing with everything doesn't move the comet
+   (`frontend/src/lib/statements.ts`). A rating of 1–5 reads as −1…1 on the item's axis (reversed for
+   negatively keyed items), and the Kalman update averages them into the estimate.
+3. **Topics**: tap what lights you up; tap again to go deeper (curious, into it, obsessed).
+
+Taps are scored in the browser with a TypeScript port of the backend's update math
+(`frontend/src/lib/estimate.ts`), so they apply instantly. A shared fixture
+(`backend/tests/fixtures/apply_observation.json`) keeps both implementations identical. Any step can
+take an optional **say more**, typed or dictated, which Claude reads on the backend.
+
+While you answer, the camera travels with the comet and the axes stay hidden; each answer fires a
+flare and the comet sets off for its new position. It doesn't go in a
+straight line: each move takes a winding route through one or two random detours (seeded by the
+answer, so replays retrace it exactly), flown at a random cruising speed with a slow drift, and an
+answer mid-flight carries straight on into the next leg. Each move is also a hyperspace jump:
+stars stretch into a tunnel of streaks radiating from the comet, a blue-white flash fires, the view
+lurches wider, and the whole sky swings round to a new region while it's hidden, so every answer
+arrives somewhere new (reduced motion keeps the new sky, without the tunnel or flash). Distant
+galaxies scattered over the sky turn with it, so each arrival shows different landmarks. While you
+answer, the comet trails only a wake for the leg it's flying, which dissolves behind it on arrival:
+the route so far, and the stars marking past answers, stay hidden until the map. After the last step
+the journey replays from the start with the camera riding along, then it pulls back to the comet's
+final place and the axes fade in around it. Dashed lines drop from the comet to each axis, and a
+"where you landed" card reads out each dimension on a scale, with a band for how sure the estimate
+is, plus the feeling and interests. Hover a memory star to read that answer back, and use the
+timeline to scrub or replay the journey. Readings are shown in plain
+language ("leaning introvert"); chart mode shows the exact numbers.
+
+Personality is estimated with a per-axis Kalman filter, so repeated readings converge on
+where the person sits instead of drifting to the edge of the space.
+
+### Comparing with friends (constellations)
+
+From the result card's **Friends** tab, enter a first name or nickname and **Create link** to start a
+constellation, then share the link (`/?c=<id>`). A friend who opens it sees an invitation, takes
+the journey, and joins with their own name. Everyone in the constellation then appears on each
+other's map as a named star, and the Friends tab lists them by how alike you are, with the
+interests you share. Joining a different link moves you to that constellation.
+
+Only a name and the final reading (position, certainty, mood and top five interests) are stored,
+never the answers. Each device writes its entry with a private secret; others see only a hash of
+it, salted per constellation. Constellations hold up to 50 people and expire 180 days after
+their last change. Creating constellations is rate limited per client (5 per 10 minutes and 20
+per day, counted in Redis against a hash of the caller's IP); the server answers `429` with a
+`Retry-After` header past that.
+
+Storage is [Upstash Redis](https://vercel.com/marketplace/upstash) over its REST API. In the Vercel
+project, add it under **Storage → Create Database → Upstash for Redis** and connect it to the
+project; that sets `KV_REST_API_URL` and `KV_REST_API_TOKEN`, with any custom prefix chosen
+when connecting (e.g. `STORAGE_KV_REST_API_URL`). The `UPSTASH_REDIS_REST_*` names work too. Without them, sharing is switched off and the Friends tab is hidden. For local
+development, `GROUPS_IN_MEMORY=true` keeps constellations in memory instead.
+
+---
+
+## Running Locally
+
+```bash
+# Backend (Python 3.12+)
+cd backend
+python -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
+cp .env.example .env            # add ANTHROPIC_API_KEY (and GROUPS_IN_MEMORY=true to try sharing)
+.venv/bin/uvicorn app.main:app --reload --port 8000
+
+# Frontend
+cd frontend
+npm install
+npm run dev                     # http://localhost:5173, proxies /api to :8000
+```
+
+Open `http://localhost:5173/?debug` for slider controls over every visual channel. The **Chart view** button
+switches from the constellation view to crisp axes and rings for reading exact positions.
+
+### Checks
+
+```bash
+cd backend  && .venv/bin/pytest && .venv/bin/ruff check . && .venv/bin/ruff format --check .
+cd frontend && npm run lint && npm test && npm run build
+```
 
 ---
 

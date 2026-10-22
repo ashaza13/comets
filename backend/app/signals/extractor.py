@@ -1,145 +1,90 @@
-import json
-import re
-from app.llm.provider import LLMConfig, complete
-from app.signals.models import (
-    SignalDeltas,
-    PersonalityDelta,
-    EmotionTarget,
-    InterestDelta,
-)
+from typing import Protocol
 
-_SYSTEM_PROMPT = """\
-You are a signal extractor for a personality visualization system.
-Your only job is to analyze text and return a JSON object describing personality, emotion, and interest signals detected in it.
+import anthropic
 
-Output ONLY raw JSON — no markdown fences, no explanation, no extra text.
+from app.config import Settings
+from app.signals.models import Observation
+from app.spec import AXES, DOMAIN_IDS
 
-JSON schema (use exactly these keys):
-{
-  "personality": {
-    "x": <float -1.0 to 1.0>,
-    "y": <float -1.0 to 1.0>,
-    "z": <float -1.0 to 1.0>
-  },
-  "emotion": {
-    "hue": <float 0-360 or null>,
-    "saturation": <float 0.0-1.0 or null>,
-    "lightness": <float 0.0-1.0 or null>
-  },
-  "interests": [
-    {"domain": "<string>", "depth_delta": <float -1.0 to 1.0>}
-  ],
-  "confidence": <float 0.0-1.0>,
-  "reasoning": "<one sentence>"
-}
+_axis_lines = "\n".join(f"  {a['key']} — {a['name']}: -1 = {a['negative']}, +1 = {a['positive']}" for a in AXES)
 
-Field definitions:
+SYSTEM_PROMPT = f"""\
+You read short pieces of personal writing and estimate the signals a personality
+visualisation needs. You are describing the writing, not diagnosing the person.
 
-personality.x — social orientation
-  -1.0 = strongly introverted (prefers solitude, drained by social interaction)
-   0.0 = no clear signal
-  +1.0 = strongly extroverted (energised by people, seeks social stimulation)
+Personality axes (give the position this text suggests, or null when the text
+carries no signal for that axis — do not guess):
+{_axis_lines}
 
-personality.y — cognitive style
-  -1.0 = concrete / pragmatic (facts, procedures, what works)
-   0.0 = no clear signal
-  +1.0 = abstract / philosophical (ideas, systems, why things are)
+Emotion, following Russell's circumplex (null for any part with no signal):
+  hue — 0 red: angry/frustrated · 60 yellow: joyful/enthusiastic · 120 green: calm/content
+        · 200 blue: reflective/melancholic · 270 violet: anxious/uneasy
+  saturation — intensity, 0 flat/numb to 1 vivid
+  lightness — energy, 0 depleted to 1 highly energised
 
-personality.z — engagement mode
-  -1.0 = analytical / systematic (logic, structure, precision)
-   0.0 = no clear signal
-  +1.0 = creative / expressive (imagination, aesthetics, novelty)
+Interests: list only domains where the text shows real depth — technical
+vocabulary, detailed elaboration or genuine enthusiasm — never a passing mention.
+Use the closest domain from: {", ".join(DOMAIN_IDS)}.
+depth: 0.1–0.2 for light engagement, 0.6–0.9 when it is the dominant, expert theme.
 
-emotion.hue — type of emotion (null if no emotional content detected)
-    0 = red: angry, frustrated
-   60 = yellow: joyful, excited, enthusiastic
-  120 = green: calm, content, at ease
-  200 = blue: reflective, melancholic, withdrawn
-  270 = violet: anxious, introspective, uneasy
+confidence: how much usable signal the text holds overall (short or generic text → low).
 
-emotion.saturation — intensity of emotion (null if no signal)
-  0.0 = neutral, flat, numb
-  1.0 = strong, vivid emotional state
-
-emotion.lightness — energy level (null if no signal)
-  0.0 = depleted, exhausted
-  1.0 = highly energised
-
-interests — domains where the person showed depth or expertise
-  Only include a domain if the text contained technical vocabulary, detailed elaboration, or genuine enthusiasm — not casual mention.
-  depth_delta: how much to increase (+) or decrease (-) depth for that domain.
-  Common domains: science, mathematics, technology, software, art, music, literature, philosophy, history, psychology, athletics, cooking, nature, politics, economics, film, gaming, spirituality
-
-confidence — how much total signal was present
-  0.0 = very short / generic text with no real signal
-  1.0 = rich, detailed text with strong, clear signals
-
-reasoning — one short sentence explaining your primary reading of the text.
-
-Rules:
-- Use 0.0 for personality axes where there is no signal — do not guess.
-- Keep delta magnitudes proportional to signal strength. A passing mention = 0.1–0.2. A dominant theme = 0.6–0.9.
-- Be conservative. Under-estimating is better than over-estimating.
-- Return an empty interests array if no domain depth was demonstrated.
+The question the person was answering is given for context. Signals the question
+itself invites (e.g. depth when asked to explain an expertise) need clear support
+in the answer before you report them. Be conservative: under-estimating is better
+than over-estimating.
 """
 
 
-def _zero_deltas() -> SignalDeltas:
-    return SignalDeltas(
-        personality=PersonalityDelta(),
-        emotion=EmotionTarget(),
-        interests=[],
-        confidence=0.0,
-        reasoning="Could not parse model output.",
-    )
+# Models that accept the server-side refusal fallback; other models reject the parameter.
+_FALLBACK_MODELS = {"claude-fable-5-1", "claude-opus-5-5", "claude-opus-5", "claude-sonnet-5-5"}
 
 
-def _parse_response(raw: str) -> SignalDeltas:
-    # Strip markdown fences if the model included them despite instructions
-    cleaned = re.sub(r"```(?:json)?", "", raw).strip()
+class Extractor(Protocol):
+    def __call__(self, text: str, prompt: str | None) -> Observation: ...
 
-    # Find the outermost JSON object
-    start = cleaned.find("{")
-    end = cleaned.rfind("}") + 1
-    if start == -1 or end == 0:
-        return _zero_deltas()
 
-    try:
-        data = json.loads(cleaned[start:end])
-    except json.JSONDecodeError:
-        return _zero_deltas()
+class ExtractionError(RuntimeError):
+    pass
 
-    try:
-        p = data.get("personality", {})
-        e = data.get("emotion", {})
-        interests = [
-            InterestDelta(domain=i["domain"], depth_delta=float(i["depth_delta"]))
-            for i in data.get("interests", [])
-            if "domain" in i and "depth_delta" in i
-        ]
-        return SignalDeltas(
-            personality=PersonalityDelta(
-                x=float(p.get("x", 0.0)),
-                y=float(p.get("y", 0.0)),
-                z=float(p.get("z", 0.0)),
-            ),
-            emotion=EmotionTarget(
-                hue=e.get("hue"),
-                saturation=e.get("saturation"),
-                lightness=e.get("lightness"),
-            ),
-            interests=interests,
-            confidence=float(data.get("confidence", 0.0)),
-            reasoning=str(data.get("reasoning", "")),
+
+def build_user_message(text: str, prompt: str | None) -> str:
+    asked = f"Question asked: {prompt}\n\n" if prompt else "No question — free writing.\n\n"
+    return f'{asked}Their writing:\n"""\n{text}\n"""'
+
+
+class ClaudeExtractor:
+    def __init__(self, settings: Settings, client: anthropic.Anthropic | None = None):
+        self._settings = settings
+        self._client = client or anthropic.Anthropic()
+
+    def __call__(self, text: str, prompt: str | None) -> Observation:
+        s = self._settings
+        # Re-run a policy-declined request on Anthropic's recommended fallback model.
+        fallback = (
+            {"betas": ["server-side-fallback-2026-07-01"], "fallbacks": "default"}
+            if s.llm_model in _FALLBACK_MODELS
+            else {}
         )
-    except Exception:
-        return _zero_deltas()
+        try:
+            response = self._client.beta.messages.parse(
+                model=s.llm_model,
+                max_tokens=s.llm_max_tokens,
+                system=SYSTEM_PROMPT,
+                messages=[{"role": "user", "content": build_user_message(text, prompt)}],
+                output_format=Observation,
+                output_config={"effort": s.llm_effort},
+                **fallback,
+            )
+        except anthropic.RateLimitError as e:
+            raise ExtractionError("The model is busy right now — try again in a moment.") from e
+        except anthropic.APIStatusError as e:
+            raise ExtractionError(f"Model request failed ({e.status_code}).") from e
+        except anthropic.APIConnectionError as e:
+            raise ExtractionError("Could not reach the model provider.") from e
 
-
-def extract_signals(text: str, config: LLMConfig) -> SignalDeltas:
-    messages = [
-        {"role": "system", "content": _SYSTEM_PROMPT},
-        {"role": "user", "content": f'Analyze this text:\n\n"""\n{text}\n"""'},
-    ]
-    raw = complete(messages, config)
-    return _parse_response(raw)
+        if response.stop_reason == "refusal":
+            raise ExtractionError("The model declined to read this message.")
+        if response.parsed_output is None:
+            raise ExtractionError("The model returned no usable reading.")
+        return response.parsed_output

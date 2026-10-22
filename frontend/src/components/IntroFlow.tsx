@@ -1,18 +1,29 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import { JOURNEY_STEPS } from '../lib/journey'
+import { AXES } from '../lib/spec'
 
-const SLIDES = [
+interface Slide {
+  eyebrow: string | null
+  title: string | null
+  body: string | null
+  axes: { label: string; desc: string }[] | null
+  cta: string | null
+  autoAdvance: number | null
+}
+
+const SLIDES: Slide[] = [
   {
     eyebrow: null,
     title: 'Personality\nVectorscope',
-    body: 'A living map of who you are, built in real time from how you write.',
+    body: 'A living map of who you are, drawn from how you feel, how you choose and what you love.',
     axes: null,
     cta: null,
     autoAdvance: 3200,
   },
   {
     eyebrow: 'how it works',
-    title: 'Your words carry signals.',
-    body: 'Emotional tone. Curiosity. Ways of thinking. Every message you send moves a point through three-dimensional space — the comet behind you.',
+    title: 'Every choice carries a signal.',
+    body: 'A mood. A preference. A passion. Each one moves your comet through three-dimensional space, and its tail remembers the path.',
     axes: null,
     cta: null,
     autoAdvance: 4800,
@@ -21,198 +32,120 @@ const SLIDES = [
     eyebrow: 'three axes',
     title: null,
     body: null,
-    axes: [
-      { color: '#ff6b6b', label: 'extrovert ↔ introvert', desc: 'how you relate to the world' },
-      { color: '#6bff9e', label: 'abstract ↔ concrete',   desc: 'how you think and explain' },
-      { color: '#6bb5ff', label: 'analytical ↔ intuitive', desc: 'how you make decisions'   },
-    ],
+    axes: AXES.map((a) => ({ label: `${a.negative} ↔ ${a.positive}`, desc: a.description })),
     cta: null,
     autoAdvance: 4800,
   },
   {
+    eyebrow: 'reading the comet',
+    title: null,
+    body: 'Its colour is your mood. Its glow is your energy. Jets mark the subjects you know deeply. The haze tightens as the scope gets surer of you.',
+    axes: null,
+    cta: null,
+    autoAdvance: 5600,
+  },
+  {
     eyebrow: 'ready',
     title: 'No right answers.',
-    body: 'Just respond honestly. The scope reads the signals in how you write.',
+    body: `About a minute of quick taps (${JOURNEY_STEPS} in all). Your comet travels with each one, and the full map of where you are appears at the end.`,
     axes: null,
     cta: 'Begin',
     autoAdvance: null,
   },
-] as const
-
-// After this many answered questions, App transitions to main layout
-export const INTRO_COMPLETE_AT = 3
+]
 
 interface Props {
   exiting: boolean
-  connected: boolean
-  promptSuggestion: string | null
-  isLoading: boolean
-  error: string | null
-  onSend: (text: string) => void
-  messageCount: number
-  onSkip: () => void
+  /** Leave the intro (Begin or skip). */
+  onDone: () => void
+  /** Opened from a friend's constellation link. */
+  invited?: boolean
 }
 
-type InternalPhase = 'slides' | 'questions'
-
-export function IntroFlow({
-  exiting,
-  connected,
-  promptSuggestion,
-  isLoading,
-  error,
-  onSend,
-  messageCount,
-  onSkip,
-}: Props) {
-  const [internalPhase, setInternalPhase] = useState<InternalPhase>('slides')
-  const [slideIdx, setSlideIdx]           = useState(0)
+export function IntroFlow({ exiting, onDone, invited = false }: Props) {
+  const [slideIdx, setSlideIdx] = useState(0)
   const [contentVisible, setContentVisible] = useState(true)
-  const [input, setInput]                 = useState('')
-  const textareaRef                       = useRef<HTMLTextAreaElement>(null)
-
   const slide = SLIDES[slideIdx]
-
-  // ── Slide auto-advance ────────────────────────────────────────────────────
-  useEffect(() => {
-    if (internalPhase !== 'slides' || !slide.autoAdvance) return
-    const id = setTimeout(() => advanceSlide(), slide.autoAdvance)
-    return () => clearTimeout(id)
-  }, [slideIdx, internalPhase]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const fadeTransition = useCallback((cb: () => void) => {
     setContentVisible(false)
-    setTimeout(() => { cb(); setContentVisible(true) }, 380)
+    setTimeout(() => {
+      cb()
+      setContentVisible(true)
+    }, 380)
   }, [])
 
   const advanceSlide = useCallback(() => {
-    if (slideIdx < SLIDES.length - 1) {
-      fadeTransition(() => setSlideIdx(s => s + 1))
-    } else {
-      fadeTransition(() => setInternalPhase('questions'))
-    }
-  }, [slideIdx, fadeTransition])
+    if (slideIdx < SLIDES.length - 1) fadeTransition(() => setSlideIdx((s) => s + 1))
+    else onDone()
+  }, [slideIdx, fadeTransition, onDone])
 
-  // Focus textarea when entering questions phase
+  // ── Slide auto-advance ────────────────────────────────────────────────────
   useEffect(() => {
-    if (internalPhase === 'questions') {
-      setTimeout(() => textareaRef.current?.focus(), 400)
-    }
-  }, [internalPhase])
+    if (!slide.autoAdvance) return
+    const id = setTimeout(() => advanceSlide(), slide.autoAdvance)
+    return () => clearTimeout(id)
+  }, [slide.autoAdvance, advanceSlide])
 
-  const handleSubmit = useCallback(() => {
-    const trimmed = input.trim()
-    if (!trimmed || isLoading || !connected) return
-    setInput('')
-    onSend(trimmed)
-  }, [input, isLoading, connected, onSend])
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSubmit() }
-  }
-
-  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className={`intro-overlay ${exiting ? 'intro-overlay--exiting' : ''}`}>
-
-      {/* Skip link */}
-      <button className="intro-skip" onClick={onSkip} tabIndex={0}>
-        skip →
+      <button className="intro-skip" onClick={onDone} tabIndex={0}>
+        Skip intro
       </button>
 
       <div className={`intro-content ${contentVisible ? 'intro-content--visible' : ''}`}>
+        <div className="intro-slide">
+          {slide.eyebrow && <span className="intro-eyebrow">{slide.eyebrow}</span>}
 
-        {/* ── SLIDES ─────────────────────────────────────────────────────── */}
-        {internalPhase === 'slides' && (
-          <div className="intro-slide">
-            {slide.eyebrow && (
-              <span className="intro-eyebrow">{slide.eyebrow}</span>
-            )}
+          {slide.title && (
+            <h1 className="intro-title">
+              {slide.title.split('\n').map((line, i, lines) => (
+                <span key={i}>
+                  {line}
+                  {i < lines.length - 1 && <br />}
+                </span>
+              ))}
+            </h1>
+          )}
 
-            {slide.title && (
-              <h1 className="intro-title">
-                {slide.title.split('\n').map((line, i) => (
-                  <span key={i}>{line}{i < slide.title!.split('\n').length - 1 && <br />}</span>
-                ))}
-              </h1>
-            )}
+          {slide.body && <p className="intro-body">{slide.body}</p>}
 
-            {slide.body && (
-              <p className="intro-body">{slide.body}</p>
-            )}
+          {invited && slideIdx === 0 && (
+            <p className="intro-invite">A friend shared their constellation. Take the journey, then see where you land beside them.</p>
+          )}
 
-            {slide.axes && (
-              <div className="intro-axes">
-                {slide.axes.map((ax) => (
-                  <div key={ax.label} className="intro-axis-row">
-                    <span className="intro-axis-label" style={{ color: ax.color }}>{ax.label}</span>
-                    <span className="intro-axis-desc">{ax.desc}</span>
-                  </div>
+          {slide.axes && (
+            <div className="intro-axes">
+              {slide.axes.map((ax) => (
+                <div key={ax.label} className="intro-axis-row">
+                  <span className="intro-axis-label">
+                    {ax.label}
+                  </span>
+                  <span className="intro-axis-desc">{ax.desc}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="intro-slide-footer">
+            {slide.cta ? (
+              <button className="intro-cta" onClick={advanceSlide}>
+                {slide.cta}
+              </button>
+            ) : (
+              <div className="intro-dots">
+                {SLIDES.map((_, i) => (
+                  <button
+                    key={i}
+                    className={`intro-dot ${i === slideIdx ? 'intro-dot--active' : i < slideIdx ? 'intro-dot--done' : ''}`}
+                    onClick={() => fadeTransition(() => setSlideIdx(i))}
+                    aria-label={`Slide ${i + 1}`}
+                  />
                 ))}
               </div>
             )}
-
-            <div className="intro-slide-footer">
-              {slide.cta ? (
-                <button className="intro-cta" onClick={advanceSlide}>
-                  {slide.cta}
-                </button>
-              ) : (
-                <div className="intro-dots">
-                  {SLIDES.map((_, i) => (
-                    <button
-                      key={i}
-                      className={`intro-dot ${i === slideIdx ? 'intro-dot--active' : i < slideIdx ? 'intro-dot--done' : ''}`}
-                      onClick={() => fadeTransition(() => setSlideIdx(i))}
-                      aria-label={`Slide ${i + 1}`}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
           </div>
-        )}
-
-        {/* ── QUESTIONS ──────────────────────────────────────────────────── */}
-        {internalPhase === 'questions' && (
-          <div className="intro-questions">
-            <div className="intro-q-progress">
-              {Array.from({ length: INTRO_COMPLETE_AT }).map((_, i) => (
-                <span
-                  key={i}
-                  className={`intro-q-dot ${messageCount > i ? 'intro-q-dot--filled' : ''}`}
-                />
-              ))}
-            </div>
-
-            <div className={`intro-q-prompt ${isLoading ? 'intro-q-prompt--loading' : ''}`}>
-              {promptSuggestion ?? '…'}
-            </div>
-
-            {error && <div className="intro-q-error">{error}</div>}
-
-            <div className="intro-q-input-row">
-              <textarea
-                ref={textareaRef}
-                className="intro-q-textarea"
-                value={input}
-                onChange={e => setInput(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder={isLoading ? 'reading your signal…' : 'Write freely…'}
-                disabled={isLoading || !connected}
-                rows={4}
-              />
-              <button
-                className="intro-q-submit"
-                onClick={handleSubmit}
-                disabled={isLoading || !input.trim() || !connected}
-              >
-                {isLoading ? '…' : '→'}
-              </button>
-            </div>
-          </div>
-        )}
-
+        </div>
       </div>
     </div>
   )

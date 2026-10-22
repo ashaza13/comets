@@ -1,124 +1,119 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
-import { Scene } from './components/Scene'
+import { lazy, Suspense, useState, useCallback } from 'react'
 import { ChatPanel } from './components/ChatPanel'
-import { IntroFlow, INTRO_COMPLETE_AT } from './components/IntroFlow'
-import { createSession, sendMessage } from './lib/api'
-import type { SessionState, SignalDeltas } from './lib/types'
-
-interface Message {
-  id: string
-  text: string
-  deltas: SignalDeltas
-}
+import { IntroFlow } from './components/IntroFlow'
+import { JourneyPanel } from './components/journey/JourneyPanel'
+import { useConstellation } from './groupStore'
+import { useConstellationSync } from './hooks/useConstellationSync'
+import { isJourneyComplete } from './lib/journey'
+import { useCometStore } from './store'
 
 type AppPhase = 'intro' | 'main'
 
+const DEBUG = new URLSearchParams(window.location.search).has('debug')
+const DebugPanel = lazy(() => import('./components/DebugPanel'))
+
+// The 3D scene (three.js, R3F, postprocessing) is most of the code, so it ships
+// as its own chunk. The download starts straight away, in parallel with the
+// intro, rather than when the scene first renders.
+const sceneModule = import('./components/Scene')
+const Scene = lazy(() => sceneModule.then((m) => ({ default: m.Scene })))
+
 export default function App() {
-  const [sessionId, setSessionId]               = useState<string | null>(null)
-  const [state, setState]                       = useState<SessionState | null>(null)
-  const [messages, setMessages]                 = useState<Message[]>([])
-  const [promptSuggestion, setPromptSuggestion] = useState<string | null>(null)
-  const [isLoading, setIsLoading]               = useState(false)
-  const [error, setError]                       = useState<string | null>(null)
-  const [phase, setPhase]                       = useState<AppPhase>('intro')
-  const [introExiting, setIntroExiting]         = useState(false)
-  const [chatOpen, setChatOpen]                 = useState(false)
-  const idCounter                               = useRef(0)
+  const entries      = useCometStore((s) => s.entries)
+  const isLoading    = useCometStore((s) => s.isLoading)
+  const error        = useCometStore((s) => s.error)
+  const debugComet   = useCometStore((s) => s.debugComet)
+  const send         = useCometStore((s) => s.send)
+  const reset        = useCometStore((s) => s.reset)
+  const chartMode    = useCometStore((s) => s.chartMode)
+  const toggleChart  = useCometStore((s) => s.toggleChartMode)
 
-  useEffect(() => {
-    createSession()
-      .then((id) => {
-        setSessionId(id)
-        setPromptSuggestion(
-          "What's been on your mind lately? Could be anything — work, something you saw, a feeling you can't shake.",
-        )
-      })
-      .catch(() => setError('Could not connect to backend. Is it running on port 8000?'))
-  }, [])
+  // Returning visitors with a saved comet skip straight to the sky.
+  const [phase, setPhase]               = useState<AppPhase>(() => (entries.length > 0 || DEBUG ? 'main' : 'intro'))
+  const [introExiting, setIntroExiting] = useState(false)
+  // First-time visitors get the fly-in from deep space.
+  const [flyIn] = useState(() => entries.length === 0 && !DEBUG)
+  const [chatOpen, setChatOpen]         = useState(false)
 
-  // Transition out of intro after enough questions answered
-  useEffect(() => {
-    if (phase === 'intro' && messages.length >= INTRO_COMPLETE_AT) {
-      setIntroExiting(true)
-      setTimeout(() => setPhase('main'), 650)
-    }
-  }, [messages.length, phase])
+  // The axes stay hidden until the journey is complete (always shown in ?debug).
+  const complete = isJourneyComplete(entries)
+  const revealed = DEBUG || complete
+  const finalState = entries.at(-1)?.state ?? null
+  useConstellationSync(finalState, complete)
+  const invited = useConstellation((s) => s.invite !== null && s.enabled === true)
 
-  const skipIntro = useCallback(() => {
+  const leaveIntro = useCallback(() => {
     setIntroExiting(true)
     setTimeout(() => setPhase('main'), 650)
   }, [])
 
-  const handleSend = useCallback(
-    async (text: string) => {
-      if (!sessionId) return
-      setIsLoading(true)
-      setError(null)
-      try {
-        const response = await sendMessage(sessionId, text)
-        idCounter.current += 1
-        setMessages((prev) => [
-          ...prev,
-          { id: String(idCounter.current), text, deltas: response.deltas },
-        ])
-        setState(response.state)
-        setPromptSuggestion(response.prompt_suggestion)
-      } catch (e) {
-        setError(e instanceof Error ? e.message : 'Unknown error')
-      } finally {
-        setIsLoading(false)
-      }
-    },
-    [sessionId],
-  )
+
+  const handleReset = useCallback(() => {
+    reset()
+    setChatOpen(false)
+    setIntroExiting(false)
+    setPhase('intro')
+  }, [reset])
 
   return (
     <div className="layout">
+      {DEBUG && (
+        <Suspense fallback={null}>
+          <DebugPanel />
+        </Suspense>
+      )}
 
       {/* Chat panel — hidden until user opens it */}
       <div className={`chat-panel-wrapper ${chatOpen ? 'chat-panel-wrapper--open' : ''}`}>
         <ChatPanel
-          state={state}
-          connected={sessionId !== null}
-          messages={messages}
-          promptSuggestion={promptSuggestion}
+          state={debugComet ?? entries.at(-1)?.state ?? null}
+          entries={entries}
+          exact={chartMode && revealed}
           isLoading={isLoading}
           error={error}
-          onSend={handleSend}
+          onSend={(text) => send(text, null)}
+          onReset={handleReset}
           onClose={() => setChatOpen(false)}
         />
       </div>
 
-      {/* 3D scene — always rendered */}
+      {/* 3D scene — always rendered (loaded as its own chunk) */}
       <div className="scene-container">
-        <Scene
-          state={state}
-          isLoading={isLoading}
-          demoMode={messages.length === 0}
-        />
+        <Suspense fallback={<div className="scene-fallback" />}>
+          <Scene
+            entries={entries}
+            debugState={debugComet}
+            isLoading={isLoading}
+            chartMode={chartMode}
+            revealed={revealed}
+            showControls={phase === 'main'}
+            flyIn={flyIn}
+          />
+        </Suspense>
       </div>
 
       {/* Floating toggle button — visible in main phase when panel is closed */}
       {phase === 'main' && !chatOpen && (
-        <button className="chat-open-btn" onClick={() => setChatOpen(true)}>
-          ≡ signals
+        <button
+          className={`chat-open-btn ${!complete && !DEBUG ? 'chat-open-btn--journey' : ''}`}
+          onClick={() => setChatOpen(true)}
+        >
+          Signals
+        </button>
+      )}
+
+      {phase === 'main' && !complete && !DEBUG && <JourneyPanel entries={entries} isLoading={isLoading} error={error} />}
+
+      {phase === 'main' && revealed && (
+        <button className="chart-toggle-btn" onClick={toggleChart} aria-pressed={chartMode}>
+          {chartMode ? 'Sky view' : 'Chart view'}
         </button>
       )}
 
       {/* Intro overlay */}
       {phase === 'intro' && (
-        <IntroFlow
-          exiting={introExiting}
-          connected={sessionId !== null}
-          promptSuggestion={promptSuggestion}
-          isLoading={isLoading}
-          error={error}
-          onSend={handleSend}
-          messageCount={messages.length}
-          onSkip={skipIntro}
-        />
+        <IntroFlow exiting={introExiting} onDone={leaveIntro} invited={invited} />
       )}
-
     </div>
   )
 }
