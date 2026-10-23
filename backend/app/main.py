@@ -5,6 +5,31 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.comet import apply_observation
 from app.config import get_settings
+from app.crew import (
+    BOND_DAYS,
+    CREW_TTL_SECONDS,
+    SKIPPED,
+    AnswerIn,
+    CrewDay,
+    GuessIn,
+    answer_field,
+    crew_day,
+    day_key,
+    guess_field,
+)
+from app.daily import (
+    ANSWER_WINDOW_SECONDS,
+    STARS_KEY,
+    TALLY_TTL_SECONDS,
+    DailyAnswer,
+    Tallies,
+    answered_key,
+    answers_key,
+    daily_statement,
+    is_current,
+    server_day,
+    tallies,
+)
 from app.groups import (
     Group,
     GroupFull,
@@ -20,6 +45,7 @@ from app.groups import (
     sort_members,
     to_member,
 )
+from app.reading import ClaudeReader, Reader, ReadingError, ReadingRequest, ReadingResponse
 from app.signals.extractor import ClaudeExtractor, ExtractionError, Extractor
 from app.signals.models import CometState, ObserveRequest, ObserveResponse
 from app.spec import next_prompt
@@ -156,3 +182,115 @@ def leave_group(group_id: GroupId, secret: MemberSecret, store: Store):
     s = _require(store)
     s.remove(group_id, public_id(group_id, secret))
     return Response(status_code=204)
+
+
+# ── Know your crew: guess how friends answered today's statement ──────────────
+
+DayNumber = Annotated[int, Path(ge=1, le=100_000)]
+MemberId = Annotated[str, Path(pattern=r"^[0-9a-f]{12}$")]
+
+
+def _require_day(day: int) -> None:
+    if not is_current(day):
+        raise HTTPException(status_code=422, detail="That isn't today.")
+
+
+def _crew(s: GroupStore, group_id: str, secret: str) -> tuple[str, list[str]]:
+    """Your member id and everyone's, or 404/403 if the group or your entry is gone."""
+    _require_group(s, group_id)
+    me = public_id(group_id, secret)
+    ids = [m.id for m in sort_members(s.members(group_id))]
+    if me not in ids:
+        raise HTTPException(status_code=403, detail="Join this constellation first.")
+    return me, ids
+
+
+def _crew_day(s: GroupStore, group_id: str, day: int, me: str, ids: list[str]) -> CrewDay:
+    days = [d for d in range(day - BOND_DAYS + 1, day + 1) if d >= 1]
+    return crew_day(day, me, ids, s.get_hashes([day_key(group_id, d) for d in days]))
+
+
+@app.get("/groups/{group_id}/members/{secret}/days/{day}", response_model=CrewDay)
+def get_crew_day(group_id: GroupId, secret: MemberSecret, day: DayNumber, store: Store):
+    s = _require(store)
+    me, ids = _crew(s, group_id, secret)
+    return _crew_day(s, group_id, day, me, ids)
+
+
+@app.put("/groups/{group_id}/members/{secret}/days/{day}/answer", response_model=CrewDay)
+def answer_crew_day(group_id: GroupId, secret: MemberSecret, day: DayNumber, body: AnswerIn, store: Store):
+    s = _require(store)
+    _require_day(day)
+    me, ids = _crew(s, group_id, secret)
+    # Final once given: a repeat (another device, a retry) leaves the first answer.
+    value = SKIPPED if body.response is None else body.response
+    s.set_hash_nx(day_key(group_id, day), answer_field(me), value, CREW_TTL_SECONDS)
+    return _crew_day(s, group_id, day, me, ids)
+
+
+@app.put("/groups/{group_id}/members/{secret}/days/{day}/guesses/{target}", response_model=CrewDay)
+def guess_crew_day(
+    group_id: GroupId, secret: MemberSecret, day: DayNumber, target: MemberId, body: GuessIn, store: Store
+):
+    s = _require(store)
+    _require_day(day)
+    me, ids = _crew(s, group_id, secret)
+    if target == me or target not in ids:
+        raise HTTPException(status_code=422, detail="Guess a friend in this constellation.")
+    key = day_key(group_id, day)
+    # Answer first, so you can't learn the game from friends' answers before giving yours.
+    if answer_field(me) not in s.get_hash(key):
+        raise HTTPException(status_code=409, detail="Answer today's statement first.")
+    s.set_hash_nx(key, guess_field(me, target), body.guess, CREW_TTL_SECONDS)
+    return _crew_day(s, group_id, day, me, ids)
+
+
+# ── The daily orbit: today's statement, anonymous tallies, and the reading ──────
+
+
+@app.get("/daily/{day}", response_model=Tallies)
+def get_daily(day: DayNumber, store: Store):
+    s = _require(store)
+    return tallies(day, s.get_hash(answers_key(day)), s.get_hash(STARS_KEY))
+
+
+@app.post("/daily/{day}/answer", response_model=Tallies)
+def answer_daily(day: DayNumber, body: DailyAnswer, request: Request, store: Store):
+    s = _require(store)
+    _require_day(day)
+    if body.statement_id != daily_statement(day):
+        raise HTTPException(status_code=422, detail="That isn't today's statement.")
+    # Each client counts once a day; repeats just read the tallies.
+    counted = s.hit(answered_key(day, client_key(client_ip(request))), ANSWER_WINDOW_SECONDS) == 1
+    if counted:
+        s.incr_hash(answers_key(day), f"r{body.response}", TALLY_TTL_SECONDS)
+        s.incr_hash(STARS_KEY, body.star_type)
+    return tallies(day, s.get_hash(answers_key(day)), s.get_hash(STARS_KEY), counted)
+
+
+_reader: Reader | None = None
+
+
+def get_reader() -> Reader:
+    global _reader
+    if _reader is None:
+        _reader = ClaudeReader(settings)
+    return _reader
+
+
+# Readings are cheap but not free: a generous cap per client per day.
+READINGS_PER_DAY = 20
+
+
+@app.post("/reading", response_model=ReadingResponse)
+def reading(body: ReadingRequest, request: Request, store: Store, read: Annotated[Reader, Depends(get_reader)]):
+    if (
+        store is not None
+        and store.hit(f"ratelimit:reading:{server_day()}:{client_key(client_ip(request))}", 24 * 3600)
+        > READINGS_PER_DAY
+    ):
+        raise HTTPException(status_code=429, detail="That's enough stargazing for today.")
+    try:
+        return ReadingResponse(reading=read(body))
+    except ReadingError as e:
+        raise HTTPException(status_code=502, detail=str(e)) from e

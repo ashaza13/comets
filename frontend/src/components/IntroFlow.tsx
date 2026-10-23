@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { JOURNEY_STEPS } from '../lib/journey'
 import { AXES } from '../lib/spec'
 
@@ -8,8 +8,10 @@ interface Slide {
   body: string | null
   axes: { label: string; desc: string }[] | null
   cta: string | null
-  autoAdvance: number | null
 }
+
+// A horizontal drag this long (px) is a swipe rather than a tap.
+const SWIPE_PX = 40
 
 const SLIDES: Slide[] = [
   {
@@ -18,7 +20,6 @@ const SLIDES: Slide[] = [
     body: 'A living map of who you are, drawn from how you feel, how you choose and what you love.',
     axes: null,
     cta: null,
-    autoAdvance: 3200,
   },
   {
     eyebrow: 'how it works',
@@ -26,7 +27,6 @@ const SLIDES: Slide[] = [
     body: 'A mood. A preference. A passion. Each one moves your comet through three-dimensional space, and its tail remembers the path.',
     axes: null,
     cta: null,
-    autoAdvance: 4800,
   },
   {
     eyebrow: 'three axes',
@@ -34,7 +34,6 @@ const SLIDES: Slide[] = [
     body: null,
     axes: AXES.map((a) => ({ label: `${a.negative} ↔ ${a.positive}`, desc: a.description })),
     cta: null,
-    autoAdvance: 4800,
   },
   {
     eyebrow: 'reading the comet',
@@ -42,15 +41,13 @@ const SLIDES: Slide[] = [
     body: 'Its colour is your mood. Its glow is your energy. Jets mark the subjects you know deeply. The haze tightens as the scope gets surer of you.',
     axes: null,
     cta: null,
-    autoAdvance: 5600,
   },
   {
     eyebrow: 'ready',
     title: 'No right answers.',
-    body: `About a minute of quick taps (${JOURNEY_STEPS} in all). Your comet travels with each one, and the full map of where you are appears at the end.`,
+    body: `First, set up your comet: about a minute of quick taps (${JOURNEY_STEPS} in all). After that it's one statement a day, and guessing how your friends answered it.`,
     axes: null,
     cta: 'Begin',
-    autoAdvance: null,
   },
 ]
 
@@ -80,16 +77,53 @@ export function IntroFlow({ exiting, onDone, invited = false }: Props) {
     else onDone()
   }, [slideIdx, fadeTransition, onDone])
 
-  // ── Slide auto-advance ────────────────────────────────────────────────────
+  const goBack = useCallback(() => {
+    if (slideIdx > 0) fadeTransition(() => setSlideIdx((s) => s - 1))
+  }, [slideIdx, fadeTransition])
+
+  // Readers set their own pace: tap or swipe, or the arrow keys, Space or Enter.
   useEffect(() => {
-    if (!slide.autoAdvance) return
-    const id = setTimeout(() => advanceSlide(), slide.autoAdvance)
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'Enter') {
+        e.preventDefault()
+        advanceSlide()
+      } else if (e.key === 'ArrowLeft') goBack()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [advanceSlide, goBack])
+
+  const press = useRef<{ x: number; y: number } | null>(null)
+  const onPointerUp = (e: React.PointerEvent) => {
+    const start = press.current
+    press.current = null
+    if (!start) return
+    const dx = e.clientX - start.x
+    if (Math.abs(dx) > SWIPE_PX && Math.abs(dx) > Math.abs(e.clientY - start.y)) {
+      if (dx < 0) advanceSlide()
+      else goBack()
+    } else advanceSlide()
+  }
+
+  // A gentle hint that the reader moves on, once they've had time to read.
+  const [hint, setHint] = useState(false)
+  useEffect(() => {
+    const id = setTimeout(() => setHint(true), 1500)
     return () => clearTimeout(id)
-  }, [slide.autoAdvance, advanceSlide])
+  }, [])
+
+  // Buttons inside the overlay handle their own clicks, not the tap-to-advance.
+  const own = { onPointerDown: (e: React.PointerEvent) => e.stopPropagation(), onPointerUp: (e: React.PointerEvent) => e.stopPropagation() }
 
   return (
-    <div className={`intro-overlay ${exiting ? 'intro-overlay--exiting' : ''}`}>
-      <button className="intro-skip" onClick={onDone} tabIndex={0}>
+    <div
+      className={`intro-overlay ${exiting ? 'intro-overlay--exiting' : ''}`}
+      onPointerDown={(e) => {
+        press.current = { x: e.clientX, y: e.clientY }
+      }}
+      onPointerUp={onPointerUp}
+    >
+      <button className="intro-skip" onClick={onDone} tabIndex={0} {...own}>
         Skip intro
       </button>
 
@@ -129,7 +163,7 @@ export function IntroFlow({ exiting, onDone, invited = false }: Props) {
 
           <div className="intro-slide-footer">
             {slide.cta ? (
-              <button className="intro-cta" onClick={advanceSlide}>
+              <button className="intro-cta" onClick={advanceSlide} {...own}>
                 {slide.cta}
               </button>
             ) : (
@@ -139,6 +173,7 @@ export function IntroFlow({ exiting, onDone, invited = false }: Props) {
                     key={i}
                     className={`intro-dot ${i === slideIdx ? 'intro-dot--active' : i < slideIdx ? 'intro-dot--done' : ''}`}
                     onClick={() => fadeTransition(() => setSlideIdx(i))}
+                    {...own}
                     aria-label={`Slide ${i + 1}`}
                   />
                 ))}
@@ -146,6 +181,10 @@ export function IntroFlow({ exiting, onDone, invited = false }: Props) {
             )}
           </div>
         </div>
+      </div>
+
+      <div className={`intro-hint ${hint && !slide.cta ? 'intro-hint--on' : ''}`} aria-hidden>
+        Tap to continue
       </div>
     </div>
   )

@@ -25,6 +25,11 @@ const FOLLOW: Record<CameraMode, number> = { demo: 0.6, journey: 0.6, replay: 0.
 const MAP_MIN_DISTANCE = 16
 // How long the camera eases towards a mode's framing distance after the mode changes.
 const FRAMING_SECONDS = 3
+// Coming out of a replay or a jump onto the map, the camera pulls back slowly,
+// a cinematic reveal of where the comet landed.
+const REVEAL_SECONDS = 7
+const REVEAL_SMOOTH_TIME = 2.4
+const FRAMING_SMOOTH_TIME = 1.2
 const IDLE_RESUME_SECONDS = 4
 const ORIGIN = new THREE.Vector3()
 
@@ -67,7 +72,12 @@ export function CameraRig({ mode, head, flyIn = false, mapFrame, warp }: Props) 
   const controls = useRef<Controls>(null)
   // endedAt is null until the frame loop stamps it with the clock's time.
   const interaction = useRef<{ active: boolean; endedAt: number | null }>({ active: false, endedAt: -Infinity })
-  const framing = useRef<{ mode: CameraMode | null; until: number; radius: number }>({ mode: null, until: 0, radius: 0 })
+  const framing = useRef<{ mode: CameraMode | null; until: number; radius: number; slow: boolean }>({
+    mode: null,
+    until: 0,
+    radius: 0,
+    slow: false,
+  })
   const reducedMotion = useReducedMotion()
   const tmp = useMemo(() => ({ goal: new THREE.Vector3(), before: new THREE.Vector3(), offset: new THREE.Vector3() }), [])
   const motion = useRef({ last: new THREE.Vector3(), speed: 0, started: false })
@@ -87,13 +97,20 @@ export function CameraRig({ mode, head, flyIn = false, mapFrame, warp }: Props) 
     if (framing.current.mode !== mode) {
       const first = framing.current.mode === null
       if (first && flyIn && !reducedMotion) camera.position.multiplyScalar(FLY_IN_SCALE)
-      const until = first ? (flyIn ? now + FLY_IN_SECONDS : mode === 'map' ? now + FRAMING_SECONDS : 0) : now + FRAMING_SECONDS
-      framing.current = { mode, until, radius }
+      const reveal = mode === 'map' && (framing.current.mode === 'replay' || framing.current.mode === 'journey')
+      const until = first
+        ? flyIn
+          ? now + FLY_IN_SECONDS
+          : mode === 'map'
+            ? now + FRAMING_SECONDS
+            : 0
+        : now + (reveal ? REVEAL_SECONDS : FRAMING_SECONDS)
+      framing.current = { mode, until, radius, slow: reveal }
     } else if (mode === 'map' && Math.abs(radius - framing.current.radius) > framing.current.radius * 0.05 + 0.5) {
       // The map grew or shrank (e.g. a friend joined far away): re-frame it,
       // unless the user is in the middle of moving the camera.
       framing.current.radius = radius
-      if (!active) framing.current.until = now + FRAMING_SECONDS
+      if (!active && now >= framing.current.until) framing.current = { ...framing.current, until: now + FRAMING_SECONDS, slow: false }
     }
 
     // Follow: move the orbit target to the comet and carry the camera along by
@@ -111,7 +128,7 @@ export function CameraRig({ mode, head, flyIn = false, mapFrame, warp }: Props) 
     if (now < framing.current.until && !active && !reducedMotion) {
       offset.subVectors(camera.position, c.target)
       const length = { v: offset.length() }
-      easing.damp(length, 'v', framingDistance(mode, mapFrame), 1.2, delta)
+      easing.damp(length, 'v', framingDistance(mode, mapFrame), framing.current.slow ? REVEAL_SMOOTH_TIME : FRAMING_SMOOTH_TIME, delta)
       camera.position.copy(c.target).addScaledVector(offset.normalize(), length.v)
     }
 

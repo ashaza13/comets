@@ -137,6 +137,9 @@ The prompt flow is ordered to build trust and extract progressively richer signa
 
 ### The journey
 
+The intro moves on when you're ready: tap, swipe left or press →/Space to continue, swipe right
+or ← to go back.
+
 About a minute of taps, no typing required:
 
 1. **Mood wheel**: tap a colour; the angle is the kind of feeling, the distance from the centre how
@@ -164,8 +167,9 @@ arrives somewhere new (reduced motion keeps the new sky, without the tunnel or f
 galaxies scattered over the sky turn with it, so each arrival shows different landmarks. While you
 answer, the comet trails only a wake for the leg it's flying, which dissolves behind it on arrival:
 the route so far, and the stars marking past answers, stay hidden until the map. After the last step
-the journey replays from the start with the camera riding along, then it pulls back to the comet's
-final place and the axes fade in around it. Dashed lines drop from the comet to each axis, and a
+the journey replays from the start with the camera riding along, then it pulls back slowly (about
+seven seconds) to the comet's final place and the axes fade in around it; the result card waits
+until the pull-back has settled. Dashed lines drop from the comet to each axis, and a
 "where you landed" card reads out each dimension on a scale, with a band for how sure the estimate
 is, plus the feeling and interests. Hover a memory star to read that answer back, and use the
 timeline to scrub or replay the journey. Readings are shown in plain
@@ -173,6 +177,75 @@ language ("leaning introvert"); chart mode shows the exact numbers.
 
 Personality is estimated with a per-axis Kalman filter, so repeated readings converge on
 where the person sits instead of drifting to the edge of the space.
+
+### Daily orbit
+
+The first visit is the setup round: the full journey. After that, each day (by your local date, numbered from
+Day 1 on 1 October 2026, like Wordle) asks for about twenty seconds:
+
+1. **Today's mood** on the mood wheel.
+2. **Today's statement**, the same for everyone that day. Statements are dealt from a shuffled deck
+   of the twelve, one per 12-day run, so none repeats until all have come round
+   (`frontend/src/lib/daily.ts`, mirrored in `backend/app/daily.py` and pinned by tests on both sides).
+
+The answers go through the same Kalman update, so traits move gently while the mood recolours the
+comet. Each check-in is a hyperspace jump to a new point on your orbit; the camera rides with the
+comet as it lands, then pulls back to the map. Days in a row build a 🔥 streak, and the countdown to
+tomorrow's check-in shows on the **Today** tab.
+
+The Today tab shows:
+
+- **Today's game** (below).
+- **Your star type**, from the octant your comet sits in (Supernova, Blue Giant, Red Giant, Yellow
+  Sun, Pulsar, White Dwarf, Nebula, Red Dwarf, or Binary Star when you're near the centre on
+  every axis), with how many of today's comets share it.
+- **A reading** written by Claude from the last two weeks of numbers only (positions, moods and
+  ratings; never names or text): two or three playful, horoscope-flavoured sentences about real
+  trends, with no predictions or clinical claims. It is cached per day, rate limited to 20 per
+  client per day, and replaced by a plain mood line if it fails.
+- **What everyone said** to today's statement, as five bars with yours highlighted.
+- **Share**, which copies (or opens the share sheet with) a spoiler-free result: day, star type,
+  the game's emoji row and points, streak, your last seven moods as coloured squares, and today's
+  statement with "What would I say?". It never gives your own answer away, since that's what
+  friends are guessing, and it links to your constellation, so sharing a result is also an invite.
+
+Tallies are anonymous counters in Redis: `POST /api/daily/{day}/answer` adds one to the rating and
+the star type, counted once per client per day (by a hash of the IP), for the current day ±1 only,
+and only for that day's statement. They expire after 40 days. `GET /api/daily/{day}` reads them.
+Without storage the community figures are hidden and the rest still works.
+
+### Know your crew (the daily game)
+
+The game is about how well you know each of your friends. Once you've answered today's statement,
+the Today tab asks, for up to three friends in your constellation (a seeded draw each day, so a big
+constellation rotates through everyone), **what would they say?** Tap 1–5. You can guess before or
+after they've answered:
+
+- An exact guess is 🎯 3 points, one step off is 🟡 1, anything else is ⬛ 0.
+- If a friend hasn't answered yet, the guess is locked in as ⏳ and revealed when they do, so
+  there's a reason to come back (and to nudge them).
+- A friend who skipped voids the round (⬜).
+
+Over a month the points add up for each pair of friends: **you know Sara 7/9 · Sara knows you
+4/6**. That score shows with each guess and on the Friends tab, which also names who knows you
+best and ranks the constellation by points this week (**who knows the crew best**). With no friends
+yet, the card invites you to make a link.
+
+Rules the server enforces (`backend/app/crew.py`):
+
+- Answer before you guess, and both are final. An answer can't change after friends have seen
+  guesses, and a guess can't be retried after a reveal.
+- A friend's answer is only ever returned to someone who has guessed it; everyone else just sees
+  that they've answered.
+- Only members can play, you can't guess yourself, and writes are for the current day ±1 only.
+
+Answers and guesses are stored per constellation per day (`crew:{group}:{day}`, a Redis hash) and
+expire after 40 days:
+
+- `GET /api/groups/{id}/members/{secret}/days/{day}` returns your view of the day: who has
+  answered, your answer, your guesses with reveals and points, the week's board, and how well you
+  and each friend know each other over the last 30 days.
+- `PUT …/days/{day}/answer` and `PUT …/days/{day}/guesses/{member}` write.
 
 ### Comparing with friends (constellations)
 
@@ -182,8 +255,9 @@ the journey, and joins with their own name. Everyone in the constellation then a
 other's map as a named star, and the Friends tab lists them by how alike you are, with the
 interests you share. Joining a different link moves you to that constellation.
 
-Only a name and the final reading (position, certainty, mood and top five interests) are stored,
-never the answers. Each device writes its entry with a private secret; others see only a hash of
+Only a name and the final reading (position, certainty, mood and top five interests) are stored
+for the map, never the journey's answers. The daily game also stores each member's answer to that
+day's statement, shown only to friends who guess it. Each device writes its entry with a private secret; others see only a hash of
 it, salted per constellation. Constellations hold up to 50 people and expire 180 days after
 their last change. Creating constellations is rate limited per client (5 per 10 minutes and 20
 per day, counted in Redis against a hash of the caller's IP); the server answers `429` with a

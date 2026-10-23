@@ -1,7 +1,8 @@
 """Constellations: shareable groups where friends compare where they landed.
 
 A group is a set of members, each a name plus the final comet reading (never the
-answers themselves). Members are written with a per-device secret that only the
+journey's answers; the daily game in app/crew.py keeps its own, shown only to
+friends who guess them). Members are written with a per-device secret that only the
 writer knows; the public id shown to others is a hash of it, salted with the
 group id, so the same device can't be linked across groups.
 """
@@ -95,6 +96,18 @@ class GroupStore(Protocol):
         """Count one event against `key` in the current fixed window; returns the count so far."""
         ...
 
+    def incr_hash(self, key: str, field: str, ttl_seconds: int | None = None) -> None:
+        """Add one to a counter in a hash (the daily tallies)."""
+        ...
+
+    def get_hash(self, key: str) -> dict[str, int]: ...
+
+    def set_hash_nx(self, key: str, field: str, value: int, ttl_seconds: int) -> bool:
+        """Set a field only if it isn't set yet (answers and guesses are final); True if set."""
+        ...
+
+    def get_hashes(self, keys: list[str]) -> list[dict[str, int]]: ...
+
 
 # Group creation is limited per client, over a short burst window and a whole day.
 # (limit, window in seconds)
@@ -127,6 +140,7 @@ class MemoryStore:
     def __init__(self) -> None:
         self._groups: dict[str, dict[str, Member]] = {}
         self._counts: dict[str, int] = {}
+        self._hashes: dict[str, dict[str, int]] = {}
 
     def create(self, group_id: str) -> bool:
         if group_id in self._groups:
@@ -153,6 +167,23 @@ class MemoryStore:
         # Window keys embed the window index, so old ones are simply never read again.
         self._counts[key] = self._counts.get(key, 0) + 1
         return self._counts[key]
+
+    def incr_hash(self, key: str, field: str, ttl_seconds: int | None = None) -> None:
+        h = self._hashes.setdefault(key, {})
+        h[field] = h.get(field, 0) + 1
+
+    def get_hash(self, key: str) -> dict[str, int]:
+        return dict(self._hashes.get(key, {}))
+
+    def set_hash_nx(self, key: str, field: str, value: int, ttl_seconds: int) -> bool:
+        h = self._hashes.setdefault(key, {})
+        if field in h:
+            return False
+        h[field] = value
+        return True
+
+    def get_hashes(self, keys: list[str]) -> list[dict[str, int]]:
+        return [self.get_hash(k) for k in keys]
 
 
 class UpstashStore:
@@ -203,6 +234,25 @@ class UpstashStore:
     def hit(self, key: str, window_seconds: int) -> int:
         count, _ = self._pipeline(["INCR", key], ["EXPIRE", key, window_seconds])
         return int(count)
+
+    def incr_hash(self, key: str, field: str, ttl_seconds: int | None = None) -> None:
+        commands: list[list[str | int]] = [["HINCRBY", key, field, 1]]
+        if ttl_seconds:
+            commands.append(["EXPIRE", key, ttl_seconds])
+        self._pipeline(*commands)
+
+    def get_hash(self, key: str) -> dict[str, int]:
+        return self.get_hashes([key])[0]
+
+    def set_hash_nx(self, key: str, field: str, value: int, ttl_seconds: int) -> bool:
+        created, _ = self._pipeline(["HSETNX", key, field, str(value)], ["EXPIRE", key, ttl_seconds])
+        return created == 1
+
+    def get_hashes(self, keys: list[str]) -> list[dict[str, int]]:
+        if not keys:
+            return []
+        flats = self._pipeline(*(["HGETALL", k] for k in keys))
+        return [{k: int(v) for k, v in zip(f[::2], f[1::2], strict=True)} if f else {} for f in flats]
 
 
 def sort_members(members: list[Member]) -> list[Member]:

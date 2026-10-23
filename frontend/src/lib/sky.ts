@@ -3,17 +3,10 @@ import * as THREE from 'three'
 // Orientation of the galactic band, shared by the nebula and the starfield.
 export const BAND_NORMAL = new THREE.Vector3(0.35, 1, 0.25).normalize()
 
-// Deterministic PRNG so the sky is the same on every visit.
-export function mulberry32(seed: number): () => number {
-  let a = seed >>> 0
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0
-    let t = a
-    t = Math.imul(t ^ (t >>> 15), t | 1)
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
-  }
-}
+// Deterministic PRNG so the sky is the same on every visit. It lives in seed.ts
+// (free of three.js) and is re-exported for the scene's callers.
+import { mulberry32 } from './seed'
+export { mulberry32 }
 
 // Approximate star colours by temperature, hottest (blue) to coolest (orange),
 // with weights skewed towards the white and blue-white stars we mostly see.

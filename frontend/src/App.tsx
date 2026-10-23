@@ -1,7 +1,11 @@
-import { lazy, Suspense, useState, useCallback } from 'react'
+import { lazy, Suspense, useState, useCallback, useEffect } from 'react'
 import { ChatPanel } from './components/ChatPanel'
 import { IntroFlow } from './components/IntroFlow'
+import { DailyPanel } from './components/journey/DailyPanel'
 import { JourneyPanel } from './components/journey/JourneyPanel'
+import { useCrewSync } from './hooks/useCrewSync'
+import { useDailySync } from './hooks/useDailySync'
+import { canCheckIn, checkInDays, dayNumber, streak } from './lib/daily'
 import { useConstellation } from './groupStore'
 import { useConstellationSync } from './hooks/useConstellationSync'
 import { isJourneyComplete } from './lib/journey'
@@ -41,6 +45,19 @@ export default function App() {
   const finalState = entries.at(-1)?.state ?? null
   useConstellationSync(finalState, complete)
   const invited = useConstellation((s) => s.invite !== null && s.enabled === true)
+
+  // Today's day number, refreshed each minute so a session left open over
+  // midnight offers the next check-in.
+  const [today, setToday] = useState(() => dayNumber(new Date()))
+  useEffect(() => {
+    const id = window.setInterval(() => setToday(dayNumber(new Date())), 60_000)
+    return () => window.clearInterval(id)
+  }, [])
+  // After the first journey, a short check-in once a day.
+  const checkingIn = phase === 'main' && complete && !DEBUG && canCheckIn(entries, today)
+  const checkedIn = complete && !canCheckIn(entries, today)
+  useDailySync(entries, today, checkedIn)
+  useCrewSync(entries, today, checkedIn)
 
   const leaveIntro = useCallback(() => {
     setIntroExiting(true)
@@ -88,6 +105,8 @@ export default function App() {
             revealed={revealed}
             showControls={phase === 'main'}
             flyIn={flyIn}
+            today={today}
+            checkingIn={checkingIn}
           />
         </Suspense>
       </div>
@@ -95,7 +114,7 @@ export default function App() {
       {/* Floating toggle button — visible in main phase when panel is closed */}
       {phase === 'main' && !chatOpen && (
         <button
-          className={`chat-open-btn ${!complete && !DEBUG ? 'chat-open-btn--journey' : ''}`}
+          className={`chat-open-btn ${(!complete || checkingIn) && !DEBUG ? 'chat-open-btn--journey' : ''}`}
           onClick={() => setChatOpen(true)}
         >
           Signals
@@ -103,8 +122,9 @@ export default function App() {
       )}
 
       {phase === 'main' && !complete && !DEBUG && <JourneyPanel entries={entries} isLoading={isLoading} error={error} />}
+      {checkingIn && <DailyPanel entries={entries} today={today} streak={streak(checkInDays(entries), today)} />}
 
-      {phase === 'main' && revealed && (
+      {phase === 'main' && revealed && !checkingIn && (
         <button className="chart-toggle-btn" onClick={toggleChart} aria-pressed={chartMode}>
           {chartMode ? 'Sky view' : 'Chart view'}
         </button>
