@@ -144,21 +144,21 @@ interface ShareInput {
   streak: number
   moods: { hue: number; saturation: number }[]
   statement: Statement
-  response: number | null
-  /** Share of everyone who gave the same answer today (0–1), when known. */
-  agreed: number | null
+  /** Today's game as emoji (e.g. "Know your crew" 🎯🟡⏳ 4/6), once played. */
+  game: { label: string; emojis: string } | null
   url: string
 }
 
-/** The Wordle-style result to paste into a group chat. */
-export function shareText({ day, star, streak, moods, statement, response, agreed, url }: ShareInput): string {
+/**
+ * The Wordle-style result to paste into a group chat. It never gives away your
+ * own answer, since that's what friends are guessing.
+ */
+export function shareText({ day, star, streak, moods, statement, game, url }: ShareInput): string {
   const lines = [`Comets · Day ${day} ${star.emoji} ${star.name}`]
+  if (game) lines.push(`${game.label} ${game.emojis}`)
   if (streak > 1) lines.push(`🔥 ${streak}-day streak`)
   if (moods.length) lines.push(moods.map(moodSquare).join(''))
-  if (response !== null) {
-    const same = agreed !== null ? ` (${Math.round(agreed * 100)}% same)` : ''
-    lines.push(`“${statementText(statement)}” → ${RESPONSES[response - 1].toLowerCase()}${same}`)
-  }
+  lines.push(`“${statementText(statement)}” How did I answer?`)
   lines.push(url)
   return lines.join('\n')
 }

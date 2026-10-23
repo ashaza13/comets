@@ -28,8 +28,9 @@ export function ResultCard({ state, exact, onReplay, entries, today }: Props) {
   const sharing = useConstellation((s) => s.enabled === true)
   const friendCount = useConstellation((s) => (s.membership ? s.members.filter((m) => m.id !== s.membership!.memberId).length : 0))
   // Open on Friends when you came from a friend's link, so joining is the next
-  // step; returning visitors open on Today; a first journey on where you landed.
-  const returning = checkInDays(entries).length > 1
+  // step; returning visitors and anyone with friends to guess open on Today; a
+  // first journey on where you landed.
+  const returning = checkInDays(entries).length > 1 || friendCount > 0
   const [tab, setTab] = useState<'you' | 'today' | 'friends'>(invited ? 'friends' : returning ? 'today' : 'you')
   const topInterests = Object.entries(state.interests)
     .filter(([, d]) => d > 0.05)
@@ -68,7 +69,7 @@ export function ResultCard({ state, exact, onReplay, entries, today }: Props) {
       {sharing && tab === 'friends' ? (
         <ConstellationPanel state={state} />
       ) : tab === 'today' ? (
-        <DailyCard entries={entries} today={today} />
+        <DailyCard entries={entries} today={today} onInvite={() => setTab('friends')} />
       ) : (
         <>
           <h2 className="result-title">{AXES.map((a) => describeAxis(a, state.personality[a.key])).join('\u00a0· ')}</h2>

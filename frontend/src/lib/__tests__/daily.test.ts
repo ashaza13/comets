@@ -95,23 +95,23 @@ describe('star types', () => {
 })
 
 describe('share text', () => {
-  it('reads like a daily result for a group chat', () => {
+  it('reads like a daily result for a group chat, without giving your answer away', () => {
     const text = shareText({
       day: 43,
       star: STAR_BY_ID['blue-giant'],
       streak: 6,
       moods: [{ hue: 200, saturation: 0.7 }, { hue: 60, saturation: 0.8 }, { hue: 120, saturation: 0.1 }],
       statement: STATEMENTS[9],
-      response: 4,
-      agreed: 0.58,
-      url: 'https://comets.example/',
+      game: { label: 'Know your crew', emojis: '🎯🟡⏳ 4/6' },
+      url: 'https://comets.example/?c=abcdefghij',
     })
     expect(text.split('\n')).toEqual([
       'Comets · Day 43 🔵 Blue Giant',
+      'Know your crew 🎯🟡⏳ 4/6',
       '🔥 6-day streak',
       `${moodSquare({ hue: 200, saturation: 0.7 })}${moodSquare({ hue: 60, saturation: 0.8 })}⬜`,
-      '“I keep in the background.” → moderately accurate (58% same)',
-      'https://comets.example/',
+      '“I keep in the background.” How did I answer?',
+      'https://comets.example/?c=abcdefghij',
     ])
     expect(moodSquare({ hue: 60, saturation: 0.8 })).toBe('🟨')
   })

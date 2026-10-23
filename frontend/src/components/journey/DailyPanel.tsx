@@ -3,6 +3,7 @@ import { describeEmotion } from '../../lib/describe'
 import { moodObservation, statementObservation } from '../../lib/journey'
 import type { Entry } from '../../lib/schema'
 import { RESPONSES, statementText } from '../../lib/statements'
+import { useConstellation } from '../../groupStore'
 import { useCometStore } from '../../store'
 import { MoodWheel } from './MoodWheel'
 import { StatementRating } from './StatementRating'
@@ -16,6 +17,7 @@ interface Props {
 /** Today's check-in: how you feel, then the statement everyone rates today. */
 export function DailyPanel({ entries, today, streak }: Props) {
   const answer = useCometStore((s) => s.answer)
+  const inCrew = useConstellation((s) => s.membership !== null && s.members.length > 1)
   const statement = dailyStatement(today)
   const moodDone = moodDoneToday(entries, today)
   const prompt = moodDone ? statementText(statement) : 'How are you today?'
@@ -28,7 +30,7 @@ export function DailyPanel({ entries, today, streak }: Props) {
         {streak > 0 && <span className="daily-streak">🔥 {streak}</span>}
       </div>
 
-      {moodDone && <div className="journey-hint">Today’s statement, the same for everyone</div>}
+      {moodDone && <div className="journey-hint">{inCrew ? 'Today’s statement. Your friends will guess your answer' : 'Today’s statement, the same for everyone'}</div>}
       <h2 className="journey-prompt">{prompt}</h2>
 
       {!moodDone ? (

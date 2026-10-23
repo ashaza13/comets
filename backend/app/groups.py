@@ -1,7 +1,8 @@
 """Constellations: shareable groups where friends compare where they landed.
 
 A group is a set of members, each a name plus the final comet reading (never the
-answers themselves). Members are written with a per-device secret that only the
+journey's answers; the daily game in app/crew.py keeps its own, shown only to
+friends who guess them). Members are written with a per-device secret that only the
 writer knows; the public id shown to others is a hash of it, salted with the
 group id, so the same device can't be linked across groups.
 """
@@ -101,6 +102,12 @@ class GroupStore(Protocol):
 
     def get_hash(self, key: str) -> dict[str, int]: ...
 
+    def set_hash_nx(self, key: str, field: str, value: int, ttl_seconds: int) -> bool:
+        """Set a field only if it isn't set yet (answers and guesses are final); True if set."""
+        ...
+
+    def get_hashes(self, keys: list[str]) -> list[dict[str, int]]: ...
+
 
 # Group creation is limited per client, over a short burst window and a whole day.
 # (limit, window in seconds)
@@ -168,6 +175,16 @@ class MemoryStore:
     def get_hash(self, key: str) -> dict[str, int]:
         return dict(self._hashes.get(key, {}))
 
+    def set_hash_nx(self, key: str, field: str, value: int, ttl_seconds: int) -> bool:
+        h = self._hashes.setdefault(key, {})
+        if field in h:
+            return False
+        h[field] = value
+        return True
+
+    def get_hashes(self, keys: list[str]) -> list[dict[str, int]]:
+        return [self.get_hash(k) for k in keys]
+
 
 class UpstashStore:
     """Redis over Upstash's REST API: one hash per group, field per member."""
@@ -225,8 +242,17 @@ class UpstashStore:
         self._pipeline(*commands)
 
     def get_hash(self, key: str) -> dict[str, int]:
-        (flat,) = self._pipeline(["HGETALL", key])
-        return {k: int(v) for k, v in zip(flat[::2], flat[1::2], strict=True)} if flat else {}
+        return self.get_hashes([key])[0]
+
+    def set_hash_nx(self, key: str, field: str, value: int, ttl_seconds: int) -> bool:
+        created, _ = self._pipeline(["HSETNX", key, field, str(value)], ["EXPIRE", key, ttl_seconds])
+        return created == 1
+
+    def get_hashes(self, keys: list[str]) -> list[dict[str, int]]:
+        if not keys:
+            return []
+        flats = self._pipeline(*(["HGETALL", k] for k in keys))
+        return [{k: int(v) for k, v in zip(f[::2], f[1::2], strict=True)} if f else {} for f in flats]
 
 
 def sort_members(members: list[Member]) -> list[Member]:

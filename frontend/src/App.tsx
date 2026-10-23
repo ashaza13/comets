@@ -3,6 +3,7 @@ import { ChatPanel } from './components/ChatPanel'
 import { IntroFlow } from './components/IntroFlow'
 import { DailyPanel } from './components/journey/DailyPanel'
 import { JourneyPanel } from './components/journey/JourneyPanel'
+import { useCrewSync } from './hooks/useCrewSync'
 import { useDailySync } from './hooks/useDailySync'
 import { canCheckIn, checkInDays, dayNumber, streak } from './lib/daily'
 import { useConstellation } from './groupStore'
@@ -54,7 +55,9 @@ export default function App() {
   }, [])
   // After the first journey, a short check-in once a day.
   const checkingIn = phase === 'main' && complete && !DEBUG && canCheckIn(entries, today)
-  useDailySync(entries, today, complete && !canCheckIn(entries, today))
+  const checkedIn = complete && !canCheckIn(entries, today)
+  useDailySync(entries, today, checkedIn)
+  useCrewSync(entries, today, checkedIn)
 
   const leaveIntro = useCallback(() => {
     setIntroExiting(true)

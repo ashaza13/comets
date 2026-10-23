@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react'
+import { crowdGuess, useCrew } from '../crewStore'
 import { useDaily } from '../dailyStore'
+import { useConstellation } from '../groupStore'
+import { CrewGame, useCrewMode, useGameSummary } from './CrewGame'
 import {
   checkInDays,
   dailyResponse,
@@ -11,6 +14,7 @@ import {
   untilNextCheckIn,
 } from '../lib/daily'
 import { rarity, shareOf } from '../lib/dailyApi'
+import { shareUrl } from '../lib/groups'
 import type { Entry } from '../lib/schema'
 import { describeEmotion } from '../lib/describe'
 import { starType } from '../lib/stars'
@@ -31,13 +35,20 @@ function useNow(): Date {
 interface Props {
   entries: Entry[]
   today: number
+  /** Open the Friends tab, to start or share a constellation. */
+  onInvite: () => void
 }
 
 /** Today in your orbit: your star, the reading, what everyone said, and a result to share. */
-export function DailyCard({ entries, today }: Props) {
+export function DailyCard({ entries, today, onInvite }: Props) {
   const now = useNow()
   const { tallies, reading, readingFailed } = useDaily()
   const [copied, setCopied] = useState(false)
+  const mode = useCrewMode(today)
+  const game = useGameSummary(today, mode)
+  const groupId = useConstellation((s) => s.membership?.id ?? null)
+  // On your own, everyone's answers stay hidden until you've guessed the crowd.
+  const crowdPending = useCrew((s) => mode.kind === 'crowd' && crowdGuess(s.crowd, today) === undefined)
   const state = entries.at(-1)?.state
   if (!state) return null
 
@@ -58,9 +69,8 @@ export function DailyCard({ entries, today }: Props) {
       streak,
       moods: recentMoods(entries),
       statement,
-      response: answered,
-      agreed: same,
-      url: `${window.location.origin}/`,
+      game,
+      url: groupId ? shareUrl(groupId) : `${window.location.origin}/`,
     })
     try {
       if ('share' in navigator && matchMedia('(pointer: coarse)').matches) await navigator.share({ text })
@@ -76,6 +86,8 @@ export function DailyCard({ entries, today }: Props) {
 
   return (
     <div className="daily-card">
+      <CrewGame today={today} mode={mode} onInvite={onInvite} />
+
       <div className="daily-star" style={{ ['--star' as string]: star.color }}>
         <span className="daily-star-dot" aria-hidden />
         <div>
@@ -101,7 +113,7 @@ export function DailyCard({ entries, today }: Props) {
       <div className="daily-question">
         <div className="dim">Day {today} · today’s statement</div>
         <div className="daily-statement">“{statementText(statement)}”</div>
-        {todays && total > 0 && (
+        {todays && total > 0 && !crowdPending && (
           <div className="daily-bars" role="img" aria-label="How everyone answered today">
             {RESPONSES.map((label, i) => {
               const n = todays.answers[String(i + 1)] ?? 0
@@ -117,7 +129,7 @@ export function DailyCard({ entries, today }: Props) {
           {answered !== null ? (
             <>
               You said <strong>{RESPONSES[answered - 1].toLowerCase()}</strong>
-              {same !== null && total > 1 && <span className="dim"> · {pct(same)} of {total} comets agreed</span>}
+              {same !== null && total > 1 && !crowdPending && <span className="dim"> · {pct(same)} of {total} comets agreed</span>}
             </>
           ) : (
             <span className="dim">You skipped today’s statement.</span>

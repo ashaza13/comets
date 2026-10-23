@@ -180,7 +180,7 @@ where the person sits instead of drifting to the edge of the space.
 
 ### Daily orbit
 
-The first visit is the full journey. After that, each day (by your local date, numbered from
+The first visit is the setup round: the full journey. After that, each day (by your local date, numbered from
 Day 1 on 1 October 2026, like Wordle) asks for about twenty seconds:
 
 1. **Today's mood** on the mood wheel.
@@ -195,6 +195,7 @@ tomorrow's check-in shows on the **Today** tab.
 
 The Today tab shows:
 
+- **Today's game** (below).
 - **Your star type**, from the octant your comet sits in (Supernova, Blue Giant, Red Giant, Yellow
   Sun, Pulsar, White Dwarf, Nebula, Red Dwarf, or Binary Star when you're near the centre on
   every axis), with how many of today's comets share it.
@@ -203,13 +204,45 @@ The Today tab shows:
   trends, with no predictions or clinical claims. It is cached per day, rate limited to 20 per
   client per day, and replaced by a plain mood line if it fails.
 - **What everyone said** to today's statement, as five bars with yours highlighted.
-- **Share**, which copies (or opens the share sheet with) a spoiler-free summary: day, star type,
-  streak, your last seven moods as coloured squares, and the share who answered as you did.
+- **Share**, which copies (or opens the share sheet with) a spoiler-free result: day, star type,
+  the game's emoji row and points, streak, your last seven moods as coloured squares, and today's
+  statement with "How did I answer?". It never gives your own answer away, since that's what
+  friends are guessing, and it links to your constellation, so sharing a result is also an invite.
 
 Tallies are anonymous counters in Redis: `POST /api/daily/{day}/answer` adds one to the rating and
 the star type, counted once per client per day (by a hash of the IP), for the current day ±1 only,
 and only for that day's statement. They expire after 40 days. `GET /api/daily/{day}` reads them.
 Without storage the community figures are hidden and the rest still works.
+
+### Know your crew (the daily game)
+
+Once you've answered today's statement, the Today tab asks how well you know your friends: for up
+to three friends in your constellation (a seeded draw each day, so a big constellation rotates
+through everyone), **how did they answer?** Tap 1–5. An exact guess is 🎯 3 points, one step off is
+🟡 1, anything else ⬛ 0. If a friend hasn't checked in yet, the guess is locked in as ⏳ and
+revealed when they do, so there's a reason to come back (and to nudge them). A friend who skipped
+voids the round (⬜). The Friends tab ranks the constellation by points this week: **who knows the
+crew best**.
+
+Rules the server enforces (`backend/app/crew.py`):
+
+- Answer before you guess, and both are final. An answer can't change after friends have seen
+  guesses, and a guess can't be retried after a reveal.
+- A friend's answer is only ever returned to someone who has guessed it; everyone else just sees
+  that they've answered.
+- Only members can play; you can't guess yourself; writes are for the current day ±1 only.
+
+Answers and guesses are stored per constellation per day (`crew:{group}:{day}`, a Redis hash) and
+expire after 40 days:
+
+- `GET /api/groups/{id}/members/{secret}/days/{day}` returns your view of the day: who has
+  answered, your answer, your guesses with reveals and points, and the week's board.
+- `PUT …/days/{day}/answer` and `PUT …/days/{day}/guesses/{member}` write.
+
+On your own, with no friends in a constellation yet, the game is **guess the crowd**: what share
+of comets called today's statement accurate? Within 5 points is 🎯, within 15 is 🟡. It's revealed
+once five comets have answered, and the bars of everyone's answers stay hidden until you've locked
+in a guess. A link underneath starts a constellation.
 
 ### Comparing with friends (constellations)
 
@@ -219,8 +252,9 @@ the journey, and joins with their own name. Everyone in the constellation then a
 other's map as a named star, and the Friends tab lists them by how alike you are, with the
 interests you share. Joining a different link moves you to that constellation.
 
-Only a name and the final reading (position, certainty, mood and top five interests) are stored,
-never the answers. Each device writes its entry with a private secret; others see only a hash of
+Only a name and the final reading (position, certainty, mood and top five interests) are stored
+for the map, never the journey's answers. The daily game also stores each member's answer to that
+day's statement, shown only to friends who guess it. Each device writes its entry with a private secret; others see only a hash of
 it, salted per constellation. Constellations hold up to 50 people and expire 180 days after
 their last change. Creating constellations is rate limited per client (5 per 10 minutes and 20
 per day, counted in Redis against a hash of the caller's IP); the server answers `429` with a

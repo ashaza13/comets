@@ -45,7 +45,7 @@ const SLIDES: Slide[] = [
   {
     eyebrow: 'ready',
     title: 'No right answers.',
-    body: `About a minute of quick taps (${JOURNEY_STEPS} in all). Your comet travels with each one, and the full map of where you are appears at the end.`,
+    body: `First, set up your comet: about a minute of quick taps (${JOURNEY_STEPS} in all). After that it's one statement a day, and guessing how your friends answered it.`,
     axes: null,
     cta: 'Begin',
   },

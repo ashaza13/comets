@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useCrew } from '../crewStore'
 import { useConstellation } from '../groupStore'
 import { emotionCss } from '../lib/color'
 import { describeAxis } from '../lib/describe'
@@ -30,6 +31,30 @@ function FriendRow({ friend, you }: { friend: Member; you: CometState }) {
   )
 }
 
+/** Who knows the crew best: points from guessing each other this week. */
+function Leaderboard({ members, me }: { members: Member[]; me: string }) {
+  const data = useCrew((s) => s.data)
+  const board = data?.board ?? []
+  const names = new Map(members.map((m) => [m.id, m.name]))
+  const rows = board.filter((r) => names.has(r.member_id))
+  if (rows.length < 2 || rows.every((r) => r.week === 0)) return null
+  return (
+    <div className="board">
+      <div className="board-head dim">Who knows the crew best · this week</div>
+      <ol className="board-rows">
+        {rows.map((r, i) => (
+          <li key={r.member_id} className={`board-row ${r.member_id === me ? 'board-row--me' : ''}`}>
+            <span className="board-rank">{i + 1}</span>
+            <span className="board-name">{r.member_id === me ? 'You' : names.get(r.member_id)}</span>
+            <span className="dim">{r.today > 0 ? `+${r.today} today` : ''}</span>
+            <span className="board-points">{r.week}</span>
+          </li>
+        ))}
+      </ol>
+    </div>
+  )
+}
+
 function ShareLink({ groupId }: { groupId: string }) {
   const [copied, setCopied] = useState(false)
   const url = shareUrl(groupId)
@@ -51,7 +76,7 @@ function ShareLink({ groupId }: { groupId: string }) {
       {'share' in navigator && (
         <button
           className="share-btn"
-          onClick={() => navigator.share({ title: 'Our constellation', text: 'See where we land compared to each other.', url }).catch(() => undefined)}
+          onClick={() => navigator.share({ title: 'Our constellation', text: 'Join my constellation: each day we guess how well we know each other.', url }).catch(() => undefined)}
         >
           Share
         </button>
@@ -86,7 +111,7 @@ export function ConstellationPanel({ state }: Props) {
             ? members.length > 0
               ? `${names(members)} ${members.length === 1 ? 'is' : 'are'} in this constellation. Add your comet to see how you compare.`
               : 'You were invited to a constellation. Add your comet to see how you compare.'
-            : 'Make a link for friends. When they finish their journey, they land on your map and you see how alike you are.'}
+            : 'Make a link for friends. Each day you answer one statement, then guess how your friends answered it, and see where you all land in the cosmos.'}
         </p>
         <form
           className="constellation-form"
@@ -109,7 +134,7 @@ export function ConstellationPanel({ state }: Props) {
           </button>
         </form>
         <p className="constellation-note">
-          Anyone with the link sees your name and where you landed, not your answers.
+          Anyone with the link sees your name and where you landed. Each day’s answer is shown only to friends who guess it.
           {invite && membership && ' Joining this leaves your current constellation.'}
         </p>
         {error && <p className="constellation-error">{error}</p>}
@@ -124,8 +149,9 @@ export function ConstellationPanel({ state }: Props) {
   return (
     <div className="constellation">
       <ShareLink groupId={membership.id} />
+      <Leaderboard members={members} me={membership.memberId} />
       {friends.length === 0 ? (
-        <p className="constellation-lead">No one else yet. Send the link to a friend; they'll appear here and on your map.</p>
+        <p className="constellation-lead">No one else yet. Send the link to a friend: once they've taken the journey you'll guess each other's answers every day, and they'll appear on your map.</p>
       ) : (
         <ul className="friends">
           {friends.map((f) => (
