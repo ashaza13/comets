@@ -15,6 +15,8 @@ from app.daily import TALLY_TTL_SECONDS, daily_statement
 CREW_TTL_SECONDS = TALLY_TTL_SECONDS
 # The board adds up this many days, ending today.
 WEEK_DAYS = 7
+# How well you know each friend (and they you) adds up over this many days.
+BOND_DAYS = 30
 # A skipped statement is stored as this, so guesses on it are void rather than pending.
 SKIPPED = 0
 
@@ -65,6 +67,18 @@ class BoardRow(BaseModel):
     week: int
 
 
+class Bond(BaseModel):
+    """How well you and one friend know each other, over the last BOND_DAYS."""
+
+    member_id: str
+    # Your points guessing them, out of the most you could have scored.
+    you_know: int
+    you_max: int
+    # Their points guessing you.
+    knows_you: int
+    knows_you_max: int
+
+
 class CrewDay(BaseModel):
     day: int
     statement_id: str
@@ -74,6 +88,7 @@ class CrewDay(BaseModel):
     my_answer: int | None
     guesses: list[Guess]
     board: list[BoardRow]
+    bonds: list[Bond]
 
 
 def _parse(fields: dict[str, int]) -> tuple[dict[str, int], dict[tuple[str, str], int]]:
@@ -101,10 +116,22 @@ def day_points(fields: dict[str, int]) -> dict[str, int]:
     return totals
 
 
-def crew_day(day: int, me: str, members: list[str], week: list[dict[str, int]]) -> CrewDay:
-    """Today as `me` sees it. `week` holds the stored fields for each day of the
-    week, oldest first, ending with today."""
-    today = week[-1] if week else {}
+def _pair_scores(fields: dict[str, int]) -> dict[tuple[str, str], tuple[int, int]]:
+    """(points, most possible) for each guesser→target pair revealed on one day."""
+    answers, guesses = _parse(fields)
+    scores: dict[tuple[str, str], tuple[int, int]] = {}
+    for pair, guess in guesses.items():
+        actual = answers.get(pair[1])
+        p = points(guess, actual) if actual is not None else None
+        if p is not None:
+            scores[pair] = (p, max(POINTS.values()))
+    return scores
+
+
+def crew_day(day: int, me: str, members: list[str], history: list[dict[str, int]]) -> CrewDay:
+    """Today as `me` sees it. `history` holds the stored fields for each day,
+    oldest first, ending with today."""
+    today = history[-1] if history else {}
     answers, guesses = _parse(today)
     mine = [
         Guess(
@@ -116,12 +143,28 @@ def crew_day(day: int, me: str, members: list[str], week: list[dict[str, int]]) 
         for (guesser, target), guess in guesses.items()
         if guesser == me and target in members
     ]
-    per_day = [day_points(fields) for fields in week]
+    week = [day_points(fields) for fields in history[-WEEK_DAYS:]]
     board = [
-        BoardRow(member_id=m, today=per_day[-1].get(m, 0) if per_day else 0, week=sum(d.get(m, 0) for d in per_day))
+        BoardRow(member_id=m, today=week[-1].get(m, 0) if week else 0, week=sum(d.get(m, 0) for d in week))
         for m in members
     ]
     board.sort(key=lambda r: (-r.week, -r.today))
+
+    totals: dict[tuple[str, str], list[int]] = {}
+    for fields in history[-BOND_DAYS:]:
+        for pair, (p, most) in _pair_scores(fields).items():
+            if me in pair:
+                t = totals.setdefault(pair, [0, 0])
+                t[0] += p
+                t[1] += most
+    bonds = []
+    for m in members:
+        if m == me:
+            continue
+        you = totals.get((me, m), [0, 0])
+        them = totals.get((m, me), [0, 0])
+        bonds.append(Bond(member_id=m, you_know=you[0], you_max=you[1], knows_you=them[0], knows_you_max=them[1]))
+
     return CrewDay(
         day=day,
         statement_id=daily_statement(day),
@@ -129,4 +172,5 @@ def crew_day(day: int, me: str, members: list[str], week: list[dict[str, int]]) 
         my_answer=answers.get(me),
         guesses=mine,
         board=board,
+        bonds=bonds,
     )

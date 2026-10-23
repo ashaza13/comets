@@ -11,20 +11,6 @@ interface CrewStore {
   /** Share your own answer with the crew (final once given). */
   answer: (day: number, response: number | null) => Promise<void>
   guess: (day: number, target: string, guess: number) => Promise<void>
-  /** Your guess at the crowd, by day, kept on this device. */
-  crowd: Record<number, number>
-  guessCrowd: (day: number, percent: number) => void
-}
-
-const CROWD = (day: number) => `comets:crowd:${day}`
-
-function readCrowd(day: number): number | undefined {
-  try {
-    const v = localStorage.getItem(CROWD(day))
-    return v === null ? undefined : Number(v)
-  } catch {
-    return undefined
-  }
 }
 
 export const useCrew = create<CrewStore>()((set, get) => {
@@ -48,7 +34,6 @@ export const useCrew = create<CrewStore>()((set, get) => {
     data: null,
     busy: false,
     error: null,
-    crowd: {},
 
     load: (day) => call((g, s) => crewApi.get(g, s, day)),
 
@@ -60,19 +45,6 @@ export const useCrew = create<CrewStore>()((set, get) => {
       await call((g, s) => crewApi.guess(g, s, day, target, guess))
       set({ busy: false })
     },
-
-    guessCrowd: (day, percent) => {
-      try {
-        localStorage.setItem(CROWD(day), String(percent))
-      } catch {
-        // Kept for this visit only.
-      }
-      set({ crowd: { ...get().crowd, [day]: percent } })
-    },
   }
 })
 
-/** Your crowd guess for `day`, from this visit or an earlier one. */
-export function crowdGuess(crowd: Record<number, number>, day: number): number | undefined {
-  return crowd[day] ?? readCrowd(day)
-}

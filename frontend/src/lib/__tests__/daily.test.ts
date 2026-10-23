@@ -110,7 +110,7 @@ describe('share text', () => {
       'Know your crew 🎯🟡⏳ 4/6',
       '🔥 6-day streak',
       `${moodSquare({ hue: 200, saturation: 0.7 })}${moodSquare({ hue: 60, saturation: 0.8 })}⬜`,
-      '“I keep in the background.” How did I answer?',
+      '“I keep in the background.” What would I say?',
       'https://comets.example/?c=abcdefghij',
     ])
     expect(moodSquare({ hue: 60, saturation: 0.8 })).toBe('🟨')

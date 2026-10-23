@@ -158,7 +158,7 @@ export function shareText({ day, star, streak, moods, statement, game, url }: Sh
   if (game) lines.push(`${game.label} ${game.emojis}`)
   if (streak > 1) lines.push(`🔥 ${streak}-day streak`)
   if (moods.length) lines.push(moods.map(moodSquare).join(''))
-  lines.push(`“${statementText(statement)}” How did I answer?`)
+  lines.push(`“${statementText(statement)}” What would I say?`)
   lines.push(url)
   return lines.join('\n')
 }

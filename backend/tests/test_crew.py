@@ -81,7 +81,9 @@ def test_answers_are_only_shown_to_those_who_guessed(store):
     r = client.get(url(g, C)).json()
     # Lee sees that Sara answered, not what she said.
     assert r["answered"] == [b] and r["guesses"] == [] and r["my_answer"] is None
-    assert "5" not in str(r["answered"])
+    # Nothing else in the response carries an answer: no guesses, no points.
+    assert all(row["today"] == row["week"] == 0 for row in r["board"])
+    assert all(b["you_max"] == b["knows_you_max"] == 0 for b in r["bonds"])
 
 
 def test_skips_void_guesses(store):
@@ -117,6 +119,22 @@ def test_the_week_adds_up():
     assert [(row.member_id, row.today, row.week) for row in r.board] == [("x", 3, 6), ("y", 1, 1), ("gone", 0, 0)]
     # Guesses on someone who has left aren't listed.
     assert crew_day(30, "x", ["x"], [today]).guesses == []
+
+
+def test_how_well_you_know_each_friend():
+    # x guessed y on both days (3 + 0 points); y guessed x once (1 point); y skipped once.
+    day1 = {"a:x": 1, "a:y": 5, "g:x:y": 5, "g:y:x": 2}
+    day2 = {"a:x": 4, "a:y": 2, "g:x:y": 5}
+    day3 = {"a:x": 3, "a:y": 0, "g:x:y": 3}
+    old = [{"a:x": 1, "a:y": 1, "g:x:y": 1}] * 40  # too long ago to count
+    (bond,) = crew_day(43, "x", ["x", "y"], [*old, day1, day2, day3]).bonds
+    # 30 days of history: 27 of the old days (each 3/3) plus days 1–3.
+    assert (bond.you_know, bond.you_max) == (27 * 3 + 3 + 0, 27 * 3 + 6)
+    (fresh,) = crew_day(3, "x", ["x", "y"], [day1, day2, day3]).bonds
+    assert fresh.model_dump() == {"member_id": "y", "you_know": 3, "you_max": 6, "knows_you": 1, "knows_you_max": 3}
+    # From y's side it's the mirror image.
+    (mirror,) = crew_day(3, "y", ["x", "y"], [day1, day2, day3]).bonds
+    assert (mirror.you_know, mirror.you_max, mirror.knows_you, mirror.knows_you_max) == (1, 3, 3, 6)
 
 
 def test_upstash_set_once_and_read_many():

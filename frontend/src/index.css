@@ -1289,6 +1289,12 @@ button { font-family: inherit; }
 .crew-prompt-small { margin: 0; font-size: 13px; color: var(--text-2); }
 .crew-prompt-small strong { color: var(--text); }
 .crew-statement { font-size: 12.5px; }
+.crew-quote { color: var(--text-2); }
+.crew-result > div { min-width: 0; }
+.crew-bond { font-size: 11.5px; margin-top: 1px; }
+.friend-bond { margin-top: 4px; font-size: 12px; color: var(--accent); }
+.friend-best { margin: 0 0 12px; font-size: 13px; color: var(--text-2); }
+.friend-best strong { color: var(--accent); font-weight: 600; }
 .crew-note { font-size: 12px; }
 .crew .rating { gap: 6px; }
 .crew .rating-option { min-height: 64px; gap: 8px; padding: 10px 4px; font-size: 11.5px; }
@@ -1298,10 +1304,6 @@ button { font-family: inherit; }
 .crew-emoji { width: 18px; flex-shrink: 0; text-align: center; }
 .crew-name { font-weight: 600; color: var(--text); }
 .crew-total { font-size: 12.5px; color: var(--text); font-variant-numeric: tabular-nums; }
-.crew-invite { align-self: flex-start; padding: 0; color: var(--accent); }
-.crowd-slider { display: flex; align-items: center; gap: 12px; }
-.crowd-slider input { flex: 1; accent-color: var(--accent); }
-.crowd-value { min-width: 3.2em; text-align: right; font-size: 17px; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
 .crew .journey-primary { align-self: flex-start; }
 
 /* Who knows the crew best: the week's points on the Friends tab. */

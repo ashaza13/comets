@@ -1,69 +1,68 @@
-import { useState } from 'react'
-import { crowdGuess, useCrew } from '../crewStore'
+import { useCrew } from '../crewStore'
 import { useConstellation } from '../groupStore'
-import { useDaily } from '../dailyStore'
 import type { Member } from '../lib/groups'
-import { crewScore, crowdAgreed, crowdPoints, MAX_POINTS, pickFriends, roundEmoji, type Guess } from '../lib/crew'
+import { crewScore, knowScore, MAX_POINTS, pickFriends, roundEmoji, type Bond, type Guess } from '../lib/crew'
 import { dailyStatement } from '../lib/daily'
 import { RESPONSES, statementText } from '../lib/statements'
 import { StatementRating } from './journey/StatementRating'
 
-// The crowd is revealed once enough people have answered for it to mean something.
-export const CROWD_MIN = 5
-
 const said = (actual: number) => RESPONSES[actual - 1].toLowerCase()
 
-interface Props {
-  today: number
-  /** Open the Friends tab, to start or share a constellation. */
-  onInvite: () => void
-}
+export type CrewMode = { kind: 'off' } | { kind: 'alone'; hasCrew: boolean } | { kind: 'friends'; picks: Member[] }
 
-export type CrewMode = { kind: 'off' } | { kind: 'crowd'; hasCrew: boolean } | { kind: 'friends'; picks: Member[] }
-
-/** Which game today is: friends to guess, the crowd (no friends yet), or none (sharing off). */
+/** Which game today is: friends to guess, nobody yet (an invite), or none (sharing off). */
 export function useCrewMode(today: number): CrewMode {
   const enabled = useConstellation((s) => s.enabled === true)
   const membership = useConstellation((s) => s.membership)
   const members = useConstellation((s) => s.members)
   if (!enabled) return { kind: 'off' }
   const friends = membership ? members.filter((m) => m.id !== membership.memberId) : []
-  if (!membership || friends.length === 0) return { kind: 'crowd', hasCrew: !!membership }
+  if (!membership || friends.length === 0) return { kind: 'alone', hasCrew: !!membership }
   return { kind: 'friends', picks: pickFriends(friends, today, membership.memberId) }
 }
 
 /** The day's result as emoji, for the share text; null until you've played. */
 export function useGameSummary(today: number, mode: CrewMode): { label: string; emojis: string } | null {
   const data = useCrew((s) => s.data)
-  const crowd = useCrew((s) => s.crowd)
-  const tallies = useDaily((s) => s.tallies)
-  if (mode.kind === 'friends') {
-    if (data?.day !== today) return null
-    const guesses = mode.picks.flatMap((p) => data.guesses.filter((g) => g.target === p.id))
-    if (guesses.length === 0) return null
-    const { points, scored } = crewScore(guesses)
-    const total = scored > 0 ? ` ${points}/${scored * MAX_POINTS}` : ''
-    return { label: 'Know your crew', emojis: guesses.map(roundEmoji).join('') + total }
-  }
-  if (mode.kind === 'crowd') {
-    const locked = crowdGuess(crowd, today)
-    if (locked === undefined) return null
-    const todays = tallies?.day === today ? tallies : null
-    const total = todays ? Object.values(todays.answers).reduce((a, b) => a + b, 0) : 0
-    const agreed = todays && total >= CROWD_MIN ? crowdAgreed(todays) : null
-    return { label: 'Guess the crowd', emojis: agreed === null ? '⏳' : roundEmoji({ actual: 1, points: crowdPoints(locked, agreed) }) }
-  }
-  return null
+  if (mode.kind !== 'friends' || data?.day !== today) return null
+  const guesses = mode.picks.flatMap((p) => data.guesses.filter((g) => g.target === p.id))
+  if (guesses.length === 0) return null
+  const { points, scored } = crewScore(guesses)
+  const total = scored > 0 ? ` ${points}/${scored * MAX_POINTS}` : ''
+  return { label: 'Know your crew', emojis: guesses.map(roundEmoji).join('') + total }
 }
 
-/** Today's game: guess how your friends answered (or, on your own, the crowd). */
-export function CrewGame({ today, mode, onInvite }: Props & { mode: CrewMode }) {
+interface Props {
+  today: number
+  mode: CrewMode
+  /** Open the Friends tab, to start or share a constellation. */
+  onInvite: () => void
+}
+
+/** Today's game: what would each of a few friends say to today's statement? */
+export function CrewGame({ today, mode, onInvite }: Props) {
   if (mode.kind === 'off') return null
-  if (mode.kind === 'crowd') return <CrowdRound today={today} onInvite={onInvite} hasCrew={mode.hasCrew} />
+  if (mode.kind === 'alone') return <Invite hasCrew={mode.hasCrew} onInvite={onInvite} />
   return <FriendRounds today={today} picks={mode.picks} />
 }
 
-function FriendRounds({ today, picks }: { today: number; picks: { id: string; name: string }[] }) {
+function Invite({ hasCrew, onInvite }: { hasCrew: boolean; onInvite: () => void }) {
+  return (
+    <div className="crew">
+      <div className="crew-head">Know your crew</div>
+      <h3 className="crew-prompt">How well do you know your friends?</h3>
+      <p className="crew-prompt-small">
+        Each day, guess what they’d say to the day’s statement, and they guess you. Over time you’ll see who you know
+        best, and who knows you best.
+      </p>
+      <button className="journey-primary journey-primary--small" onClick={onInvite}>
+        {hasCrew ? 'Share your link' : 'Make a link for friends'}
+      </button>
+    </div>
+  )
+}
+
+function FriendRounds({ today, picks }: { today: number; picks: Member[] }) {
   const { data, busy, error, guess } = useCrew()
   const statement = dailyStatement(today)
   const current = data?.day === today ? data : null
@@ -78,23 +77,32 @@ function FriendRounds({ today, picks }: { today: number; picks: { id: string; na
   }
 
   const guesses = new Map(current.guesses.map((g) => [g.target, g]))
+  const bonds = new Map(current.bonds.map((b) => [b.member_id, b]))
   const next = picks.find((p) => !guesses.has(p.id))
-  const round = picks.indexOf(next!) + 1
 
   if (next) {
+    const known = bondLine(next.name, bonds.get(next.id))
     return (
       <div className="crew" aria-live="polite">
         <div className="crew-head">
-          Know your crew <span className="dim">· round {round} of {picks.length}</span>
+          Know your crew{' '}
+          <span className="dim">
+            · {picks.indexOf(next) + 1} of {picks.length}
+          </span>
         </div>
         <h3 className="crew-prompt">
-          How did <strong>{next.name}</strong> answer?
+          What would <strong>{next.name}</strong> say?
         </h3>
-        <div className="crew-statement dim">“{statementText(statement)}”</div>
+        <div className="crew-statement">
+          <span className="crew-quote">“{statementText(statement)}”</span>
+          {known && <span className="dim"> · {known}</span>}
+        </div>
         <StatementRating key={next.id} skippable={false} disabled={busy} onRate={(r) => r !== null && void guess(today, next.id, r)} />
-        {current.answered.includes(next.id) ? null : (
-          <div className="crew-note dim">{next.name} hasn’t checked in yet; you’ll see when they do.</div>
-        )}
+        <div className="crew-note dim">
+          {current.answered.includes(next.id)
+            ? `${next.name} has answered. Lock in your guess to see.`
+            : `${next.name} hasn’t answered yet; you’ll see when they do.`}
+        </div>
         {error && <p className="constellation-error">{error}</p>}
       </div>
     )
@@ -108,90 +116,40 @@ function FriendRounds({ today, picks }: { today: number; picks: { id: string; na
         Know your crew <span className="crew-score">{played.map((r) => roundEmoji(r.g)).join('')}</span>
       </div>
       <ul className="crew-results">
-        {played.map(({ friend, g }) => (
-          <li key={friend.id} className="crew-result">
-            <span className="crew-emoji" aria-hidden>
-              {roundEmoji(g)}
-            </span>
-            <span className="crew-name">{friend.name}</span>
-            <span className="dim">{reveal(g)}</span>
-          </li>
-        ))}
+        {played.map(({ friend, g }) => {
+          const known = bondLine(friend.name, bonds.get(friend.id))
+          return (
+            <li key={friend.id} className="crew-result">
+              <span className="crew-emoji" aria-hidden>
+                {roundEmoji(g)}
+              </span>
+              <div>
+                <div>
+                  <span className="crew-name">{friend.name}</span> <span className="dim">{reveal(g)}</span>
+                </div>
+                {known && <div className="crew-bond dim">{known}</div>}
+              </div>
+            </li>
+          )
+        })}
       </ul>
       <div className="crew-total">
-        {score.scored > 0 ? `${score.points} of ${score.scored * MAX_POINTS} points` : 'Points appear as friends check in'}
-        {score.scored > 0 && score.pending > 0 && <span className="dim"> · {score.pending} still to check in</span>}
+        {score.scored > 0 ? `${score.points} of ${score.scored * MAX_POINTS} points today` : 'Points appear as friends answer'}
+        {score.scored > 0 && score.pending > 0 && <span className="dim"> · {score.pending} still to answer</span>}
       </div>
     </div>
   )
+}
+
+/** "You know Sara 7/9" (over the last month), once there's something to go on. */
+function bondLine(name: string, bond: Bond | undefined): string | null {
+  const score = bond ? knowScore(bond.you_know, bond.you_max) : null
+  return score ? `you know ${name} ${score}` : null
 }
 
 function reveal(g: Guess): string {
-  if (g.actual === null) return `you said ${said(g.guess)} · waiting`
+  if (g.actual === null) return `you think ${said(g.guess)} · waiting for them`
   if (g.actual === 0) return 'skipped today'
   if (g.actual === g.guess) return `said ${said(g.actual)}`
   return `said ${said(g.actual)} · you guessed ${said(g.guess)}`
-}
-
-function CrowdRound({ today, onInvite, hasCrew }: { today: number; onInvite: () => void; hasCrew: boolean }) {
-  const tallies = useDaily((s) => s.tallies)
-  const crowd = useCrew((s) => s.crowd)
-  const guessCrowd = useCrew((s) => s.guessCrowd)
-  const [value, setValue] = useState(50)
-  const locked = crowdGuess(crowd, today)
-  const todays = tallies?.day === today ? tallies : null
-  const total = todays ? Object.values(todays.answers).reduce((a, b) => a + b, 0) : 0
-  const agreed = todays && total >= CROWD_MIN ? crowdAgreed(todays) : null
-
-  const invite = (
-    <button className="journey-link crew-invite" onClick={onInvite}>
-      {hasCrew ? 'Share your link to play with friends →' : 'Play with friends: make a link →'}
-    </button>
-  )
-
-  if (locked === undefined) {
-    return (
-      <div className="crew">
-        <div className="crew-head">Guess the crowd</div>
-        <h3 className="crew-prompt">What share of comets called today’s statement accurate?</h3>
-        <div className="crowd-slider">
-          <input
-            type="range"
-            min={0}
-            max={100}
-            value={value}
-            onChange={(e) => setValue(Number(e.target.value))}
-            aria-label="Your guess, percent"
-          />
-          <span className="crowd-value">{value}%</span>
-        </div>
-        <button className="journey-primary journey-primary--small" onClick={() => guessCrowd(today, value)}>
-          Lock it in
-        </button>
-        {invite}
-      </div>
-    )
-  }
-
-  const points = agreed !== null ? crowdPoints(locked, agreed) : null
-  return (
-    <div className="crew">
-      <div className="crew-head">
-        Guess the crowd{' '}
-        {points !== null && <span className="crew-score">{roundEmoji({ actual: 1, points })}</span>}
-      </div>
-      <p className="crew-prompt-small">
-        You guessed <strong>{locked}%</strong>
-        {agreed !== null ? (
-          <>
-            {' '}
-            · <strong>{Math.round(agreed * 100)}%</strong> of {total} comets called it accurate
-          </>
-        ) : (
-          <span className="dim"> · revealed once {CROWD_MIN} comets have answered ({total} so far)</span>
-        )}
-      </p>
-      {invite}
-    </div>
-  )
 }

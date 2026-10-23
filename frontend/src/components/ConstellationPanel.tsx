@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useCrew } from '../crewStore'
+import { knowScore, knowsYouBest, type Bond } from '../lib/crew'
 import { useConstellation } from '../groupStore'
 import { emotionCss } from '../lib/color'
 import { describeAxis } from '../lib/describe'
@@ -13,7 +14,7 @@ const names = (members: Member[]) => {
 }
 
 /** Friends compared with you: how alike, where they landed, what you share. */
-function FriendRow({ friend, you }: { friend: Member; you: CometState }) {
+function FriendRow({ friend, you, bond }: { friend: Member; you: CometState; bond?: Bond }) {
   const alike = Math.round(likeness(you.personality, friend.personality) * 100)
   const shared = sharedInterests(you.interests, friend.interests).slice(0, 2)
   return (
@@ -27,7 +28,22 @@ function FriendRow({ friend, you }: { friend: Member; you: CometState }) {
       </div>
       <div className="friend-reading">{AXES.map((a) => describeAxis(a, friend.personality[a.key])).join(' · ')}</div>
       {shared.length > 0 && <div className="friend-shared">you both love {shared.join(' and ')}</div>}
+      {bond && <BondLine name={friend.name} bond={bond} />}
     </li>
+  )
+}
+
+/** How well you and one friend know each other, from a month of daily guesses. */
+function BondLine({ name, bond }: { name: string; bond: Bond }) {
+  const you = knowScore(bond.you_know, bond.you_max)
+  const them = knowScore(bond.knows_you, bond.knows_you_max)
+  if (!you && !them) return null
+  return (
+    <div className="friend-bond">
+      {you && <span>you know {name} {you}</span>}
+      {you && them && <span className="dim"> · </span>}
+      {them && <span>{name} knows you {them}</span>}
+    </div>
   )
 }
 
@@ -93,6 +109,7 @@ interface Props {
 /** Make or join a shared link and see how you compare with the friends on it. */
 export function ConstellationPanel({ state }: Props) {
   const { enabled, membership, invite, members, busy, error, nickname, create, join, leave } = useConstellation()
+  const crew = useCrew((s) => s.data)
   const [name, setName] = useState(nickname)
 
   if (enabled === null) return <p className="constellation-note">Checking…</p>
@@ -142,6 +159,9 @@ export function ConstellationPanel({ state }: Props) {
     )
   }
 
+  const bonds = new Map((crew?.bonds ?? []).map((b) => [b.member_id, b]))
+  const best = knowsYouBest(crew?.bonds ?? [])
+  const bestName = best ? members.find((m) => m.id === best.member_id)?.name : null
   const friends = members
     .filter((m) => m.id !== membership.memberId)
     .sort((a, b) => likeness(state.personality, b.personality) - likeness(state.personality, a.personality))
@@ -150,12 +170,17 @@ export function ConstellationPanel({ state }: Props) {
     <div className="constellation">
       <ShareLink groupId={membership.id} />
       <Leaderboard members={members} me={membership.memberId} />
+      {best && bestName && (
+        <p className="friend-best">
+          <strong>{bestName}</strong> knows you best <span className="dim">· {knowScore(best.knows_you, best.knows_you_max)} this month</span>
+        </p>
+      )}
       {friends.length === 0 ? (
         <p className="constellation-lead">No one else yet. Send the link to a friend: once they've taken the journey you'll guess each other's answers every day, and they'll appear on your map.</p>
       ) : (
         <ul className="friends">
           {friends.map((f) => (
-            <FriendRow key={f.id} friend={f} you={state} />
+            <FriendRow key={f.id} friend={f} you={state} bond={bonds.get(f.id)} />
           ))}
         </ul>
       )}

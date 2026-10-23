@@ -206,7 +206,7 @@ The Today tab shows:
 - **What everyone said** to today's statement, as five bars with yours highlighted.
 - **Share**, which copies (or opens the share sheet with) a spoiler-free result: day, star type,
   the game's emoji row and points, streak, your last seven moods as coloured squares, and today's
-  statement with "How did I answer?". It never gives your own answer away, since that's what
+  statement with "What would I say?". It never gives your own answer away, since that's what
   friends are guessing, and it links to your constellation, so sharing a result is also an invite.
 
 Tallies are anonymous counters in Redis: `POST /api/daily/{day}/answer` adds one to the rating and
@@ -216,13 +216,20 @@ Without storage the community figures are hidden and the rest still works.
 
 ### Know your crew (the daily game)
 
-Once you've answered today's statement, the Today tab asks how well you know your friends: for up
-to three friends in your constellation (a seeded draw each day, so a big constellation rotates
-through everyone), **how did they answer?** Tap 1–5. An exact guess is 🎯 3 points, one step off is
-🟡 1, anything else ⬛ 0. If a friend hasn't checked in yet, the guess is locked in as ⏳ and
-revealed when they do, so there's a reason to come back (and to nudge them). A friend who skipped
-voids the round (⬜). The Friends tab ranks the constellation by points this week: **who knows the
-crew best**.
+The game is about how well you know each of your friends. Once you've answered today's statement,
+the Today tab asks, for up to three friends in your constellation (a seeded draw each day, so a big
+constellation rotates through everyone), **what would they say?** Tap 1–5. You can guess before or
+after they've answered:
+
+- An exact guess is 🎯 3 points, one step off is 🟡 1, anything else is ⬛ 0.
+- If a friend hasn't answered yet, the guess is locked in as ⏳ and revealed when they do, so
+  there's a reason to come back (and to nudge them).
+- A friend who skipped voids the round (⬜).
+
+Over a month the points add up for each pair of friends: **you know Sara 7/9 · Sara knows you
+4/6**. That score shows with each guess and on the Friends tab, which also names who knows you
+best and ranks the constellation by points this week (**who knows the crew best**). With no friends
+yet, the card invites you to make a link.
 
 Rules the server enforces (`backend/app/crew.py`):
 
@@ -230,19 +237,15 @@ Rules the server enforces (`backend/app/crew.py`):
   guesses, and a guess can't be retried after a reveal.
 - A friend's answer is only ever returned to someone who has guessed it; everyone else just sees
   that they've answered.
-- Only members can play; you can't guess yourself; writes are for the current day ±1 only.
+- Only members can play, you can't guess yourself, and writes are for the current day ±1 only.
 
 Answers and guesses are stored per constellation per day (`crew:{group}:{day}`, a Redis hash) and
 expire after 40 days:
 
 - `GET /api/groups/{id}/members/{secret}/days/{day}` returns your view of the day: who has
-  answered, your answer, your guesses with reveals and points, and the week's board.
+  answered, your answer, your guesses with reveals and points, the week's board, and how well you
+  and each friend know each other over the last 30 days.
 - `PUT …/days/{day}/answer` and `PUT …/days/{day}/guesses/{member}` write.
-
-On your own, with no friends in a constellation yet, the game is **guess the crowd**: what share
-of comets called today's statement accurate? Within 5 points is 🎯, within 15 is 🟡. It's revealed
-once five comets have answered, and the bars of everyone's answers stay hidden until you've locked
-in a guess. A link underneath starts a constellation.
 
 ### Comparing with friends (constellations)
 

@@ -1,12 +1,12 @@
 import { z } from 'zod'
 import { request } from './groups'
 import { mulberry32, seedFrom } from './seed'
-import type { Tallies } from './dailyApi'
 
 /**
- * Know your crew: each day you answer the day's statement, then guess how a few
- * friends in your constellation answered it. Mirrors backend/app/crew.py.
- * Without friends yet, you guess the crowd instead.
+ * Know your crew: each day you answer the day's statement, then guess what a
+ * few friends in your constellation would say to it. Over the weeks it adds up
+ * to how well you know each friend, and how well each of them knows you.
+ * Mirrors backend/app/crew.py.
  */
 
 export const GuessSchema = z.object({
@@ -24,10 +24,20 @@ export const CrewDaySchema = z.object({
   my_answer: z.number().nullable(),
   guesses: z.array(GuessSchema),
   board: z.array(z.object({ member_id: z.string(), today: z.number(), week: z.number() })),
+  bonds: z.array(
+    z.object({
+      member_id: z.string(),
+      you_know: z.number(),
+      you_max: z.number(),
+      knows_you: z.number(),
+      knows_you_max: z.number(),
+    }),
+  ),
 })
 
 export type Guess = z.infer<typeof GuessSchema>
 export type CrewDay = z.infer<typeof CrewDaySchema>
+export type Bond = CrewDay['bonds'][number]
 
 const dayPath = (groupId: string, secret: string, day: number) => `/groups/${groupId}/members/${secret}/days/${day}`
 
@@ -74,17 +84,18 @@ export function crewScore(guesses: Guess[]): { points: number; scored: number; p
   }
 }
 
-// ── Solo: guess the crowd ──────────────────────────────────────────────────────
-
-/** Share of everyone today who called the statement accurate (4 or 5), 0–1. */
-export function crowdAgreed(tallies: Tallies): number | null {
-  const total = Object.values(tallies.answers).reduce((a, b) => a + b, 0)
-  if (total === 0) return null
-  return ((tallies.answers['4'] ?? 0) + (tallies.answers['5'] ?? 0)) / total
+/** How well one of you knows the other, as "7/9", or null before any guess has been revealed. */
+export function knowScore(points: number, max: number): string | null {
+  return max > 0 ? `${points}/${max}` : null
 }
 
-/** Points for guessing `guess` percent when it was `actual` (0–1): within 5 points 🎯, within 15 🟡. */
-export function crowdPoints(guess: number, actual: number): number {
-  const off = Math.abs(guess - actual * 100)
-  return off <= 5 ? MAX_POINTS : off <= 15 ? 1 : 0
+/** The friend who knows you best (by share of points, then by rounds played), if anyone has scored. */
+export function knowsYouBest(bonds: Bond[]): Bond | null {
+  const scored = bonds.filter((b) => b.knows_you_max > 0)
+  if (scored.length === 0) return null
+  return scored.reduce((best, b) => {
+    const share = b.knows_you / b.knows_you_max
+    const bestShare = best.knows_you / best.knows_you_max
+    return share > bestShare || (share === bestShare && b.knows_you_max > best.knows_you_max) ? b : best
+  })
 }

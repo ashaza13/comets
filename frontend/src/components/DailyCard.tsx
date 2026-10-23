@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import { crowdGuess, useCrew } from '../crewStore'
 import { useDaily } from '../dailyStore'
 import { useConstellation } from '../groupStore'
 import { CrewGame, useCrewMode, useGameSummary } from './CrewGame'
@@ -47,8 +46,6 @@ export function DailyCard({ entries, today, onInvite }: Props) {
   const mode = useCrewMode(today)
   const game = useGameSummary(today, mode)
   const groupId = useConstellation((s) => s.membership?.id ?? null)
-  // On your own, everyone's answers stay hidden until you've guessed the crowd.
-  const crowdPending = useCrew((s) => mode.kind === 'crowd' && crowdGuess(s.crowd, today) === undefined)
   const state = entries.at(-1)?.state
   if (!state) return null
 
@@ -113,7 +110,7 @@ export function DailyCard({ entries, today, onInvite }: Props) {
       <div className="daily-question">
         <div className="dim">Day {today} · today’s statement</div>
         <div className="daily-statement">“{statementText(statement)}”</div>
-        {todays && total > 0 && !crowdPending && (
+        {todays && total > 0 && (
           <div className="daily-bars" role="img" aria-label="How everyone answered today">
             {RESPONSES.map((label, i) => {
               const n = todays.answers[String(i + 1)] ?? 0
@@ -129,7 +126,7 @@ export function DailyCard({ entries, today, onInvite }: Props) {
           {answered !== null ? (
             <>
               You said <strong>{RESPONSES[answered - 1].toLowerCase()}</strong>
-              {same !== null && total > 1 && !crowdPending && <span className="dim"> · {pct(same)} of {total} comets agreed</span>}
+              {same !== null && total > 1 && <span className="dim"> · {pct(same)} of {total} comets agreed</span>}
             </>
           ) : (
             <span className="dim">You skipped today’s statement.</span>

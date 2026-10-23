@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { crewScore, crowdAgreed, crowdPoints, pickFriends, roundEmoji } from '../crew'
-import type { Tallies } from '../dailyApi'
+import { crewScore, knowScore, knowsYouBest, pickFriends, roundEmoji, type Bond } from '../crew'
 
 const friends = Array.from({ length: 8 }, (_, i) => ({ id: `f${i}`, name: `Friend ${i}` }))
 
@@ -37,12 +36,19 @@ describe('scoring', () => {
     expect(crewScore([g(3, 3), g(4, 1), g(null, null), g(0, null)])).toEqual({ points: 4, scored: 2, pending: 1 })
   })
 
-  it('scores the crowd by how close the guess was', () => {
-    const tallies: Tallies = { day: 1, statement_id: 'art', answers: { 1: 1, 2: 1, 3: 2, 4: 3, 5: 3 }, stars: {}, counted: false }
-    expect(crowdAgreed(tallies)).toBe(0.6)
-    expect(crowdPoints(62, 0.6)).toBe(3)
-    expect(crowdPoints(48, 0.6)).toBe(1)
-    expect(crowdPoints(20, 0.6)).toBe(0)
-    expect(crowdAgreed({ ...tallies, answers: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 } })).toBeNull()
+  it('says how well you know each other', () => {
+    expect(knowScore(7, 9)).toBe('7/9')
+    expect(knowScore(0, 0)).toBeNull()
+    const bond = (id: string, knows: number, max: number): Bond => ({
+      member_id: id,
+      you_know: 0,
+      you_max: 0,
+      knows_you: knows,
+      knows_you_max: max,
+    })
+    expect(knowsYouBest([bond('a', 2, 3), bond('b', 5, 6), bond('c', 0, 0)])?.member_id).toBe('b')
+    // On a tie, the friend with more rounds behind them.
+    expect(knowsYouBest([bond('a', 3, 3), bond('b', 9, 9)])?.member_id).toBe('b')
+    expect(knowsYouBest([bond('a', 0, 0)])).toBeNull()
   })
 })

@@ -6,9 +6,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.comet import apply_observation
 from app.config import get_settings
 from app.crew import (
+    BOND_DAYS,
     CREW_TTL_SECONDS,
     SKIPPED,
-    WEEK_DAYS,
     AnswerIn,
     CrewDay,
     GuessIn,
@@ -206,7 +206,7 @@ def _crew(s: GroupStore, group_id: str, secret: str) -> tuple[str, list[str]]:
 
 
 def _crew_day(s: GroupStore, group_id: str, day: int, me: str, ids: list[str]) -> CrewDay:
-    days = [d for d in range(day - WEEK_DAYS + 1, day + 1) if d >= 1]
+    days = [d for d in range(day - BOND_DAYS + 1, day + 1) if d >= 1]
     return crew_day(day, me, ids, s.get_hashes([day_key(group_id, d) for d in days]))
 
 
