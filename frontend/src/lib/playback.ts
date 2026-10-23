@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { INITIAL_STATE, type CometState } from './schema'
+import { seedFrom } from './seed'
 import { mulberry32 } from './sky'
 import { toWorld } from './tail'
 
@@ -62,12 +63,6 @@ const DETOUR_MIN = 2.5
 // Moves longer than this take two detours rather than one.
 const LONG_MOVE = 8
 
-/** A stable 32-bit seed from an answer's id, so its detours replay identically. */
-export function seedFrom(id: string): number {
-  let h = 0x811c9dc5
-  for (let i = 0; i < id.length; i++) h = Math.imul(h ^ id.charCodeAt(i), 0x01000193)
-  return h >>> 0
-}
 
 // The route may turn at most this sharply (cosine of ~100°) where one move hands
 // over to the next, so it sweeps on rather than doubling back on itself.

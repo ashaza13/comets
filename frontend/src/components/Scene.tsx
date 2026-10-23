@@ -52,14 +52,23 @@ interface Props {
   showControls: boolean
   /** Start far out in space and glide in (first visit). */
   flyIn: boolean
+  /** Today's day number (lib/daily.ts), for the Today tab. */
+  today: number
+  /** The daily check-in panel is open: travel with the comet as on the journey. */
+  checkingIn: boolean
 }
+
+// After a daily check-in the camera rides with the comet while it lands, then
+// pulls back slowly; the result card waits until the pull-back has mostly settled.
+const LANDING_MS = 4000
+const SETTLING_MS = 4500
 
 // Replay speed in world units per second along the journey curve, within limits.
 const REPLAY_UNITS_PER_SECOND = 9
 const REPLAY_MIN_SECONDS = 4
 const REPLAY_MAX_SECONDS = 10
 
-export function Scene({ entries, debugState, isLoading, chartMode, revealed, showControls, flyIn }: Props) {
+export function Scene({ entries, debugState, isLoading, chartMode, revealed, showControls, flyIn, today, checkingIn }: Props) {
   const comet = useRef<CometHandle>(null)
   // Stable refs into the comet handle for parts that read it every frame.
   const head = useMemo(() => ({ get current() { return comet.current?.group ?? null } }), [])
@@ -91,6 +100,20 @@ export function Scene({ entries, debugState, isLoading, chartMode, revealed, sho
   // A new object restarts the replay; its clock starts on the first animation frame.
   // `reveal` marks the replay that plays when the map is first revealed.
   const [replay, setReplay] = useState<{ from: number; reveal: boolean } | null>(null)
+
+  // What follows a reveal or a check-in: 'landing' (riding with the comet) then
+  // 'settling' (the slow pull-back), then 'none' (the result card shows).
+  const [after, setAfter] = useState<'none' | 'landing' | 'settling'>('none')
+  const [wasCheckingIn, setWasCheckingIn] = useState(checkingIn)
+  if (checkingIn !== wasCheckingIn) {
+    setWasCheckingIn(checkingIn)
+    if (!checkingIn) setAfter('landing')
+  }
+  useEffect(() => {
+    if (after === 'none') return
+    const id = window.setTimeout(() => setAfter(after === 'landing' ? 'settling' : 'none'), after === 'landing' ? LANDING_MS : SETTLING_MS)
+    return () => window.clearTimeout(id)
+  }, [after])
 
   // When the map is first revealed, replay the whole journey (adjusting state
   // during render, React's recommended alternative to an effect here).
@@ -125,6 +148,7 @@ export function Scene({ entries, debugState, isLoading, chartMode, revealed, sho
       if (progress >= 1) {
         setPlayhead(null)
         setReplay(null)
+        if (replay.reveal) setAfter('settling')
         return
       }
       setPlayhead(tToPlayhead(path, curve.getUtoTmapping(easeReplay(progress), 0)))
@@ -141,14 +165,27 @@ export function Scene({ entries, debugState, isLoading, chartMode, revealed, sho
   const state = debugState ?? history.at(-1) ?? (replaying ? INITIAL_STATE : null)
   const demo = state === null
   // The axes appear once the reveal replay has finished; later scrubbing keeps them.
-  const mapShown = revealed && !replay?.reveal
+  // Riding along: during a check-in and while the comet lands. The grid stays
+  // hidden then, as on the first journey.
+  const riding = checkingIn || after === 'landing'
+  const mapShown = revealed && !replay?.reveal && !riding
   // ?debug tunes the comet up close, so it follows the comet even though the map is shown.
   // Replays ride along with the comet; afterwards the camera pulls back to show the map.
-  const cameraMode: CameraMode = debugState ? 'journey' : replay ? 'replay' : revealed ? 'map' : demo ? 'demo' : 'journey'
+  const cameraMode: CameraMode = debugState
+    ? 'journey'
+    : replay
+      ? 'replay'
+      : riding
+        ? 'journey'
+        : revealed
+          ? 'map'
+          : demo
+            ? 'demo'
+            : 'journey'
   const tint = useMemo(() => moodTint(history, state), [history, state])
 
   // The result is marked once the map is shown and the comet is back at its final place.
-  const showResult = mapShown && !debugState && total > 0
+  const showResult = mapShown && !debugState && total > 0 && after === 'none'
 
   const startReplay = () => {
     setReplay({ from: 0, reveal: false })
@@ -217,7 +254,7 @@ export function Scene({ entries, debugState, isLoading, chartMode, revealed, sho
       </Canvas>
       <WarpFlash warp={warp} />
 
-      {showControls && revealed && total > 0 && !debugState && (
+      {showControls && revealed && !riding && total > 0 && !debugState && (
         <Timeline
           total={total}
           playhead={playhead}
@@ -231,7 +268,7 @@ export function Scene({ entries, debugState, isLoading, chartMode, revealed, sho
       )}
 
       {showControls && showResult && !replay && finalState && (
-        <ResultCard state={finalState} exact={chartMode} onReplay={startReplay} />
+        <ResultCard state={finalState} exact={chartMode} onReplay={startReplay} entries={entries} today={today} />
       )}
     </>
   )

@@ -139,6 +139,10 @@ class FakeRedis:
                 return int(bool(h and h.pop(args[0], None)))
             case "EXISTS":
                 return int(h is not None)
+            case "HINCRBY":
+                self.data.setdefault(key, {})
+                self.data[key][args[0]] = str(int(self.data[key].get(args[0], "0")) + int(args[1]))
+                return int(self.data[key][args[0]])
             case "INCR":
                 self.counts[key] = self.counts.get(key, 0) + 1
                 return self.counts[key]

@@ -1181,3 +1181,91 @@ button { font-family: inherit; }
   background: radial-gradient(circle at 50% 50%, rgba(235, 242, 255, 0.95) 0%, rgba(150, 175, 255, 0.45) 22%, rgba(80, 100, 220, 0) 60%);
   mix-blend-mode: screen;
 }
+
+/* "Tap to continue": the intro waits for the reader. */
+.intro-hint {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(32px + var(--safe-bottom));
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--text-3);
+  opacity: 0;
+  transition: opacity 0.6s ease;
+  pointer-events: none;
+}
+
+.intro-hint--on { opacity: 1; }
+/* touch-action: none keeps a horizontal swipe for the intro instead of letting
+   the browser claim it as a scroll and cancel the pointer. */
+.intro-overlay { cursor: pointer; user-select: none; -webkit-user-select: none; touch-action: none; }
+
+/* ── Daily orbit ─────────────────────────────────────────────────────────── */
+
+.daily-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+
+.daily-step { color: var(--text-3); font-weight: 500; font-variant-numeric: tabular-nums; }
+.daily-streak { margin-left: auto; color: var(--accent); font-variant-numeric: tabular-nums; }
+
+.daily-card { display: flex; flex-direction: column; gap: 14px; }
+
+.daily-star { display: flex; gap: 12px; align-items: flex-start; }
+
+.daily-star-dot {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff 0%, var(--star) 45%, transparent 72%);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--star) 60%, transparent);
+}
+
+.daily-star-name { font-size: 17px; font-weight: 600; letter-spacing: -0.015em; color: var(--text); }
+.daily-star-name .dim { font-size: 12.5px; font-weight: 500; letter-spacing: 0; }
+.daily-star-blurb { margin-top: 2px; font-size: 12.5px; color: var(--text-2); }
+
+.daily-reading {
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--text);
+  padding-left: 10px;
+  border-left: 1px solid var(--line-strong);
+}
+
+.daily-question { display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; }
+.daily-statement { font-weight: 600; color: var(--text); }
+.daily-answer strong { color: var(--text); font-weight: 600; }
+
+/* Five bars, one per answer, yours in the accent. */
+.daily-bars { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; height: 34px; align-items: end; }
+.daily-bar { height: 100%; display: flex; align-items: flex-end; }
+.daily-bar span { width: 100%; background: var(--line-strong); border-radius: 1px; }
+.daily-bar--mine span { background: var(--accent); }
+
+.daily-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  font-size: 11.5px;
+}
+
+.daily-foot .dim { flex-shrink: 1; }
+
+@media (max-width: 640px), (max-height: 500px) and (orientation: landscape) {
+  .daily-card { gap: 10px; }
+  .daily-star-blurb { display: none; }
+  .daily-bars { height: 26px; }
+}

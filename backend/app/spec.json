@@ -44,6 +44,31 @@
     { "id": "social",       "direction": [0.7071, 0, 0.7071],      "color": "#ff9ece" },
     { "id": "health",       "direction": [0.7071, 0, -0.7071],     "color": "#52b788" }
   ],
+  "statements": [
+    "life-of-party",
+    "vivid-imagination",
+    "abstract-interest",
+    "talk-a-lot",
+    "vocabulary",
+    "daydream",
+    "parties",
+    "complex-problems",
+    "art",
+    "background",
+    "good-imagination",
+    "abstract-difficulty"
+  ],
+  "star_types": [
+    "supernova",
+    "blue-giant",
+    "red-giant",
+    "yellow-sun",
+    "pulsar",
+    "white-dwarf",
+    "nebula",
+    "red-dwarf",
+    "binary"
+  ],
   "stages": [
     {
       "id": "calibrate",

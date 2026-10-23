@@ -5,6 +5,19 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.comet import apply_observation
 from app.config import get_settings
+from app.daily import (
+    ANSWER_WINDOW_SECONDS,
+    STARS_KEY,
+    TALLY_TTL_SECONDS,
+    DailyAnswer,
+    Tallies,
+    answered_key,
+    answers_key,
+    daily_statement,
+    is_current,
+    server_day,
+    tallies,
+)
 from app.groups import (
     Group,
     GroupFull,
@@ -20,6 +33,7 @@ from app.groups import (
     sort_members,
     to_member,
 )
+from app.reading import ClaudeReader, Reader, ReadingError, ReadingRequest, ReadingResponse
 from app.signals.extractor import ClaudeExtractor, ExtractionError, Extractor
 from app.signals.models import CometState, ObserveRequest, ObserveResponse
 from app.spec import next_prompt
@@ -156,3 +170,61 @@ def leave_group(group_id: GroupId, secret: MemberSecret, store: Store):
     s = _require(store)
     s.remove(group_id, public_id(group_id, secret))
     return Response(status_code=204)
+
+
+# ── The daily orbit: today's statement, anonymous tallies, and the reading ──────
+
+DayNumber = Annotated[int, Path(ge=1, le=100_000)]
+
+
+def _require_day(day: int) -> None:
+    if not is_current(day):
+        raise HTTPException(status_code=422, detail="That isn't today.")
+
+
+@app.get("/daily/{day}", response_model=Tallies)
+def get_daily(day: DayNumber, store: Store):
+    s = _require(store)
+    return tallies(day, s.get_hash(answers_key(day)), s.get_hash(STARS_KEY))
+
+
+@app.post("/daily/{day}/answer", response_model=Tallies)
+def answer_daily(day: DayNumber, body: DailyAnswer, request: Request, store: Store):
+    s = _require(store)
+    _require_day(day)
+    if body.statement_id != daily_statement(day):
+        raise HTTPException(status_code=422, detail="That isn't today's statement.")
+    # Each client counts once a day; repeats just read the tallies.
+    counted = s.hit(answered_key(day, client_key(client_ip(request))), ANSWER_WINDOW_SECONDS) == 1
+    if counted:
+        s.incr_hash(answers_key(day), f"r{body.response}", TALLY_TTL_SECONDS)
+        s.incr_hash(STARS_KEY, body.star_type)
+    return tallies(day, s.get_hash(answers_key(day)), s.get_hash(STARS_KEY), counted)
+
+
+_reader: Reader | None = None
+
+
+def get_reader() -> Reader:
+    global _reader
+    if _reader is None:
+        _reader = ClaudeReader(settings)
+    return _reader
+
+
+# Readings are cheap but not free: a generous cap per client per day.
+READINGS_PER_DAY = 20
+
+
+@app.post("/reading", response_model=ReadingResponse)
+def reading(body: ReadingRequest, request: Request, store: Store, read: Annotated[Reader, Depends(get_reader)]):
+    if (
+        store is not None
+        and store.hit(f"ratelimit:reading:{server_day()}:{client_key(client_ip(request))}", 24 * 3600)
+        > READINGS_PER_DAY
+    ):
+        raise HTTPException(status_code=429, detail="That's enough stargazing for today.")
+    try:
+        return ReadingResponse(reading=read(body))
+    except ReadingError as e:
+        raise HTTPException(status_code=502, detail=str(e)) from e

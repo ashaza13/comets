@@ -137,6 +137,9 @@ The prompt flow is ordered to build trust and extract progressively richer signa
 
 ### The journey
 
+The intro moves on when you're ready: tap, swipe left or press →/Space to continue, swipe right
+or ← to go back.
+
 About a minute of taps, no typing required:
 
 1. **Mood wheel**: tap a colour; the angle is the kind of feeling, the distance from the centre how
@@ -164,8 +167,9 @@ arrives somewhere new (reduced motion keeps the new sky, without the tunnel or f
 galaxies scattered over the sky turn with it, so each arrival shows different landmarks. While you
 answer, the comet trails only a wake for the leg it's flying, which dissolves behind it on arrival:
 the route so far, and the stars marking past answers, stay hidden until the map. After the last step
-the journey replays from the start with the camera riding along, then it pulls back to the comet's
-final place and the axes fade in around it. Dashed lines drop from the comet to each axis, and a
+the journey replays from the start with the camera riding along, then it pulls back slowly (about
+seven seconds) to the comet's final place and the axes fade in around it; the result card waits
+until the pull-back has settled. Dashed lines drop from the comet to each axis, and a
 "where you landed" card reads out each dimension on a scale, with a band for how sure the estimate
 is, plus the feeling and interests. Hover a memory star to read that answer back, and use the
 timeline to scrub or replay the journey. Readings are shown in plain
@@ -173,6 +177,39 @@ language ("leaning introvert"); chart mode shows the exact numbers.
 
 Personality is estimated with a per-axis Kalman filter, so repeated readings converge on
 where the person sits instead of drifting to the edge of the space.
+
+### Daily orbit
+
+The first visit is the full journey. After that, each day (by your local date, numbered from
+Day 1 on 1 October 2026, like Wordle) asks for about twenty seconds:
+
+1. **Today's mood** on the mood wheel.
+2. **Today's statement**, the same for everyone that day. Statements are dealt from a shuffled deck
+   of the twelve, one per 12-day run, so none repeats until all have come round
+   (`frontend/src/lib/daily.ts`, mirrored in `backend/app/daily.py` and pinned by tests on both sides).
+
+The answers go through the same Kalman update, so traits move gently while the mood recolours the
+comet. Each check-in is a hyperspace jump to a new point on your orbit; the camera rides with the
+comet as it lands, then pulls back to the map. Days in a row build a 🔥 streak, and the countdown to
+tomorrow's check-in shows on the **Today** tab.
+
+The Today tab shows:
+
+- **Your star type**, from the octant your comet sits in (Supernova, Blue Giant, Red Giant, Yellow
+  Sun, Pulsar, White Dwarf, Nebula, Red Dwarf, or Binary Star when you're near the centre on
+  every axis), with how many of today's comets share it.
+- **A reading** written by Claude from the last two weeks of numbers only (positions, moods and
+  ratings; never names or text): two or three playful, horoscope-flavoured sentences about real
+  trends, with no predictions or clinical claims. It is cached per day, rate limited to 20 per
+  client per day, and replaced by a plain mood line if it fails.
+- **What everyone said** to today's statement, as five bars with yours highlighted.
+- **Share**, which copies (or opens the share sheet with) a spoiler-free summary: day, star type,
+  streak, your last seven moods as coloured squares, and the share who answered as you did.
+
+Tallies are anonymous counters in Redis: `POST /api/daily/{day}/answer` adds one to the rating and
+the star type, counted once per client per day (by a hash of the IP), for the current day ±1 only,
+and only for that day's statement. They expire after 40 days. `GET /api/daily/{day}` reads them.
+Without storage the community figures are hidden and the rest still works.
 
 ### Comparing with friends (constellations)
 

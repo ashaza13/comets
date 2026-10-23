@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 import { z } from 'zod'
 import { observe } from './lib/api'
+import { dayNumber } from './lib/daily'
 import { applyObservation } from './lib/estimate'
 import { EntrySchema, INITIAL_STATE, type CometState, type Entry, type EntryKind, type Observation } from './lib/schema'
 
@@ -51,7 +52,10 @@ export const useCometStore = create<CometStore>()(
           const latest = s.entries.at(-1)?.state ?? INITIAL_STATE
           const state = applyObservation(latest, observation)
           return {
-            entries: [...s.entries, { id: crypto.randomUUID(), kind, text, prompt, statementId, observation, state }],
+            entries: [
+              ...s.entries,
+              { id: crypto.randomUUID(), kind, text, prompt, statementId, observation, state, day: dayNumber(new Date()) },
+            ],
             error: null,
           }
         })

@@ -43,6 +43,8 @@ export const EntrySchema = z.object({
   /** Journey step this answered; 'text' is optional free writing ("say more"). */
   kind: EntryKindSchema,
   statementId: z.string().optional(),
+  /** The day (lib/daily.ts dayNumber) a tap answer was given; free writing has none. */
+  day: z.number().int().optional(),
 })
 
 export type CometState = z.infer<typeof CometStateSchema>

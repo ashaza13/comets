@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { useConstellation } from '../groupStore'
 import { ConstellationPanel } from './ConstellationPanel'
+import { DailyCard } from './DailyCard'
+import { checkInDays } from '../lib/daily'
 import { emotionCss } from '../lib/color'
 import { describeAxis, describeDepth, describeEmotion } from '../lib/describe'
-import type { CometState } from '../lib/schema'
+import type { CometState, Entry } from '../lib/schema'
 import { AXES, domainColor } from '../lib/spec'
 
 const percent = (v: number) => `${((Math.min(Math.max(v, -1), 1) + 1) / 2) * 100}%`
@@ -14,16 +16,21 @@ interface Props {
   /** Show exact numbers (chart mode) instead of plain language. */
   exact: boolean
   onReplay: () => void
+  /** For the Today tab: the journey and daily check-ins so far, and today's day number. */
+  entries: Entry[]
+  today: number
 }
 
 /** Where the journey ended, read out axis by axis, shown once the map is revealed. */
-export function ResultCard({ state, exact, onReplay }: Props) {
+export function ResultCard({ state, exact, onReplay, entries, today }: Props) {
   const [open, setOpen] = useState(true)
   const invited = useConstellation((s) => s.invite !== null)
   const sharing = useConstellation((s) => s.enabled === true)
   const friendCount = useConstellation((s) => (s.membership ? s.members.filter((m) => m.id !== s.membership!.memberId).length : 0))
-  // Open on Friends when you came from a friend's link, so joining is the next step.
-  const [tab, setTab] = useState<'you' | 'friends'>(invited ? 'friends' : 'you')
+  // Open on Friends when you came from a friend's link, so joining is the next
+  // step; returning visitors open on Today; a first journey on where you landed.
+  const returning = checkInDays(entries).length > 1
+  const [tab, setTab] = useState<'you' | 'today' | 'friends'>(invited ? 'friends' : returning ? 'today' : 'you')
   const topInterests = Object.entries(state.interests)
     .filter(([, d]) => d > 0.05)
     .sort((a, b) => b[1] - a[1])
@@ -40,18 +47,19 @@ export function ResultCard({ state, exact, onReplay }: Props) {
   return (
     <section className="result" aria-label="Your comet">
       <header className="result-head">
-        {sharing ? (
-          <div className="result-tabs" role="tablist">
-            <button role="tab" aria-selected={tab === 'you'} className="result-tab" onClick={() => setTab('you')}>
-              Where you landed
-            </button>
+        <div className="result-tabs" role="tablist">
+          <button role="tab" aria-selected={tab === 'you'} className="result-tab" onClick={() => setTab('you')}>
+            Where you landed
+          </button>
+          <button role="tab" aria-selected={tab === 'today'} className="result-tab" onClick={() => setTab('today')}>
+            Today
+          </button>
+          {sharing && (
             <button role="tab" aria-selected={tab === 'friends'} className="result-tab" onClick={() => setTab('friends')}>
               Friends{friendCount > 0 ? ` (${friendCount})` : invited ? ' ·' : ''}
             </button>
-          </div>
-        ) : (
-          <div className="result-kicker">where you landed</div>
-        )}
+          )}
+        </div>
         <button className="result-close" onClick={() => setOpen(false)} aria-label="Hide">
           ×
         </button>
@@ -59,6 +67,8 @@ export function ResultCard({ state, exact, onReplay }: Props) {
 
       {sharing && tab === 'friends' ? (
         <ConstellationPanel state={state} />
+      ) : tab === 'today' ? (
+        <DailyCard entries={entries} today={today} />
       ) : (
         <>
           <h2 className="result-title">{AXES.map((a) => describeAxis(a, state.personality[a.key])).join('\u00a0· ')}</h2>

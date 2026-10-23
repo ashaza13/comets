@@ -66,7 +66,7 @@ export class SharingError extends Error {
   }
 }
 
-async function request<T>(path: string, schema: z.ZodType<T> | null, init?: RequestInit): Promise<T> {
+export async function request<T>(path: string, schema: z.ZodType<T> | null, init?: RequestInit): Promise<T> {
   let res: Response
   try {
     res = await fetch(`${BASE}${path}`, { ...init, headers: { 'Content-Type': 'application/json', ...init?.headers } })
